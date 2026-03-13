@@ -1,0 +1,304 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  TextInput,
+  ScrollView,
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  Linking,
+} from 'react-native';
+import { useAuth } from '../contexts/AuthContext';
+import { useApp } from '../contexts/AppContext';
+import {
+  getSubscriptionForUser,
+  cancelSubscriptionAtPeriodEnd,
+  formatPrice,
+} from '../services/subscription';
+import { createPortalSession } from '../services/stripeApi';
+import type { Subscription } from '../types';
+
+export default function SettingsScreen() {
+  const { user, logout } = useAuth();
+  const { currentBusiness, updateBusiness } = useApp();
+  const [businessName, setBusinessName] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [subLoading, setSubLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const loadSubscription = useCallback(async () => {
+    if (!user?.id) return;
+    setSubLoading(true);
+    try {
+      const sub = await getSubscriptionForUser(user.id);
+      setSubscription(sub);
+    } finally {
+      setSubLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    loadSubscription();
+  }, [loadSubscription]);
+
+  useEffect(() => {
+    if (currentBusiness) {
+      setBusinessName(currentBusiness.name);
+      setBusinessAddress(currentBusiness.address ?? '');
+    }
+  }, [currentBusiness?.id, currentBusiness?.name, currentBusiness?.address]);
+
+  const handleSaveBusiness = async () => {
+    if (!currentBusiness) return;
+    setSaving(true);
+    try {
+      await updateBusiness(currentBusiness.id, {
+        name: businessName.trim(),
+        address: businessAddress.trim(),
+      });
+      Alert.alert('Saved', 'Business details updated.');
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleLogout = () => {
+    Alert.alert('Log out', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: logout },
+    ]);
+  };
+
+  const handleCancelSubscription = () => {
+    Alert.alert(
+      'Cancel subscription',
+      'You will keep access until the end of your current billing period. After that, you will not be charged again.',
+      [
+        { text: 'Keep subscription', style: 'cancel' },
+        {
+          text: 'Cancel subscription',
+          style: 'destructive',
+          onPress: async () => {
+            if (!user?.id) return;
+            setCancelling(true);
+            try {
+              const updated = await cancelSubscriptionAtPeriodEnd(user.id);
+              setSubscription(updated ?? null);
+              Alert.alert(
+                'Subscription cancelled',
+                `You can continue using the app until ${updated ? new Date(updated.currentPeriodEnd).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'the end of your billing period'}.`
+              );
+            } catch (e) {
+              Alert.alert('Error', e instanceof Error ? e.message : 'Could not cancel.');
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const canCancel =
+    subscription &&
+    subscription.status === 'active' &&
+    !subscription.cancelAtPeriodEnd;
+
+  const handleManageBilling = async () => {
+    if (!subscription?.stripeCustomerId) return;
+    setPortalLoading(true);
+    try {
+      const returnUrl = process.env.EXPO_PUBLIC_PORTAL_RETURN_URL || process.env.EXPO_PUBLIC_STRIPE_API_URL || 'https://example.com';
+      const { url } = await createPortalSession(subscription.stripeCustomerId, returnUrl);
+      await Linking.openURL(url);
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not open billing portal.');
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
+  return (
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        <View style={styles.section}>
+          <Text style={styles.label}>Account</Text>
+          <Text style={styles.value}>{user?.email ?? '—'}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Subscription</Text>
+          <Text style={styles.hint}>Your monthly plan and billing.</Text>
+          {subLoading ? (
+            <ActivityIndicator color="#94a3b8" style={styles.subLoader} />
+          ) : subscription ? (
+            <>
+              <View style={styles.subRow}>
+                <Text style={styles.subLabel}>Plan</Text>
+                <Text style={styles.subValue}>{formatPrice(subscription)}/month</Text>
+              </View>
+              <View style={styles.subRow}>
+                <Text style={styles.subLabel}>Status</Text>
+                <Text style={styles.subValue}>
+                  {subscription.status === 'active'
+                    ? 'Active'
+                    : subscription.status === 'cancel_at_period_end'
+                      ? 'Cancelling at period end'
+                      : 'Ended'}
+                </Text>
+              </View>
+              <View style={styles.subRow}>
+                <Text style={styles.subLabel}>
+                  {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}
+                </Text>
+                <Text style={styles.subValue}>
+                  {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, {
+                    dateStyle: 'long',
+                  })}
+                </Text>
+              </View>
+              {subscription.stripeCustomerId && (
+                <TouchableOpacity
+                  style={styles.manageBillingButton}
+                  onPress={handleManageBilling}
+                  disabled={portalLoading}
+                >
+                  <Text style={styles.manageBillingButtonText}>
+                    {portalLoading ? 'Opening…' : 'Manage billing'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {canCancel && (
+                <TouchableOpacity
+                  style={styles.cancelSubButton}
+                  onPress={handleCancelSubscription}
+                  disabled={cancelling}
+                >
+                  <Text style={styles.cancelSubButtonText}>
+                    {cancelling ? 'Cancelling…' : 'Cancel subscription'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {subscription.cancelAtPeriodEnd && (
+                <Text style={styles.cancelNote}>
+                  You cancelled your subscription. You can keep using the app until the date above.
+                </Text>
+              )}
+            </>
+          ) : (
+            <Text style={styles.muted}>No subscription found.</Text>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Business details</Text>
+          <Text style={styles.hint}>Edit your current business name and address.</Text>
+          {currentBusiness ? (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Business name"
+                value={businessName}
+                onChangeText={setBusinessName}
+                placeholderTextColor="#64748b"
+              />
+              <TextInput
+                style={[styles.input, styles.inputMultiline]}
+                placeholder="Business address"
+                value={businessAddress}
+                onChangeText={setBusinessAddress}
+                placeholderTextColor="#64748b"
+                multiline
+                numberOfLines={2}
+              />
+              <TouchableOpacity
+                style={styles.saveButton}
+                onPress={handleSaveBusiness}
+                disabled={saving}
+              >
+                <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save business details'}</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <Text style={styles.muted}>Add a business from Home → Switch business.</Text>
+          )}
+        </View>
+
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutButtonText}>Log out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#0f172a' },
+  scroll: { padding: 20, paddingBottom: 40 },
+  section: { marginBottom: 28 },
+  label: { fontSize: 12, color: '#94a3b8', marginBottom: 4 },
+  value: { fontSize: 16, color: '#f8fafc' },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#e2e8f0', marginBottom: 4 },
+  hint: { fontSize: 13, color: '#94a3b8', marginBottom: 12 },
+  input: {
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 14,
+    color: '#f8fafc',
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  inputMultiline: { minHeight: 80, textAlignVertical: 'top' },
+  saveButton: {
+    backgroundColor: '#6366f1',
+    borderRadius: 12,
+    padding: 14,
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  saveButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  muted: { fontSize: 14, color: '#64748b' },
+  subLoader: { marginVertical: 12 },
+  subRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
+  subLabel: { fontSize: 14, color: '#94a3b8' },
+  subValue: { fontSize: 15, color: '#f8fafc', fontWeight: '500' },
+  manageBillingButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderRadius: 12,
+    backgroundColor: '#1e293b',
+  },
+  manageBillingButtonText: { color: '#e2e8f0', fontSize: 15, fontWeight: '600' },
+  cancelSubButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#ef4444',
+  },
+  cancelSubButtonText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
+  cancelNote: { fontSize: 13, color: '#94a3b8', marginTop: 12, fontStyle: 'italic' },
+  logoutButton: {
+    backgroundColor: '#1e293b',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+  },
+  logoutButtonText: { color: '#ef4444', fontSize: 16, fontWeight: '600' },
+});
