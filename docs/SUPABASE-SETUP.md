@@ -128,10 +128,7 @@ CREATE POLICY "Users can manage own preferences"
   USING (auth.uid() = user_id)
   WITH CHECK (auth.uid() = user_id);
 
--- If you already created policies without WITH CHECK, fix the business_accounts policy by running:
--- DROP POLICY IF EXISTS "Users can manage own businesses" ON business_accounts;
--- CREATE POLICY "Users can manage own businesses"
---   ON business_accounts FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+-- If you already created policies without WITH CHECK, fix them by running the DROP + CREATE below for the failing table.
 
 -- Storage bucket for invoice/sale attachments (optional; create in Dashboard if you use Storage)
 -- Storage → New bucket → name: attachments, public or private with RLS
@@ -143,8 +140,7 @@ If you want to store receipt/invoice images and PDFs in Supabase:
 
 1. **Storage** → **New bucket** → name: **`attachments`**, set to **Public** (so stored URLs work from any device).
 2. **Policies** → New policy: “Users can upload/read in their folder”:
-   - Allowed: `(bucket_id = 'attachments') AND (auth.uid()::text = (storage.foldername(name))[1])`
-   - Or use a simpler policy that allows authenticated users to read/write their own path prefix `{user_id}/`.
+   - Run the policy SQL in *"Troubleshooting: Storage upload returns 400"* below (INSERT + UPDATE on `storage.objects`).
 
 ## 4. Auth settings
 
@@ -219,3 +215,94 @@ This happens when inserting into `business_accounts` (or another table) and RLS 
 2. **Turn off "Confirm email" for development**  
    If Supabase requires email confirmation, the session may not be set right after signup, so `auth.uid()` can be null and RLS blocks the insert.  
    In Dashboard: **Authentication → Providers → Email** → disable **"Confirm email"** so signup logs the user in immediately. You can re-enable it for production.
+
+---
+
+## Troubleshooting: "new row violates row-level security policy" when uploading invoice (or sale)
+
+If you see this when saving an invoice or sale, the **invoices** or **sales** table policy likely doesn’t allow INSERT (missing or wrong WITH CHECK). Run the SQL below in the Supabase **SQL Editor** to fix tables and (if needed) Storage.
+
+**1. Tables (business_accounts, invoices, sales)** Run this first:
+
+```sql
+-- business_accounts (e.g. signup)
+DROP POLICY IF EXISTS "Users can manage own businesses" ON business_accounts;
+CREATE POLICY "Users can manage own businesses"
+  ON business_accounts FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
+
+-- invoices (create/update invoice, including after file upload)
+DROP POLICY IF EXISTS "Users can manage invoices of their businesses" ON invoices;
+CREATE POLICY "Users can manage invoices of their businesses"
+  ON invoices FOR ALL
+  USING (business_id IN (SELECT id FROM business_accounts WHERE user_id = auth.uid()))
+  WITH CHECK (business_id IN (SELECT id FROM business_accounts WHERE user_id = auth.uid()));
+
+-- sales (create/update sale)
+DROP POLICY IF EXISTS "Users can manage sales of their businesses" ON sales;
+CREATE POLICY "Users can manage sales of their businesses"
+  ON sales FOR ALL
+  USING (business_id IN (SELECT id FROM business_accounts WHERE user_id = auth.uid()))
+  WITH CHECK (business_id IN (SELECT id FROM business_accounts WHERE user_id = auth.uid()));
+```
+
+**2. Storage (file upload)** If the error happens when uploading the image/PDF, run this too (creates policies on `storage.objects`):
+
+```sql
+DROP POLICY IF EXISTS "Users can upload to own folder in attachments" ON storage.objects;
+CREATE POLICY "Users can upload to own folder in attachments"
+  ON storage.objects FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'attachments' AND (storage.foldername(name))[1] = auth.uid()::text);
+
+DROP POLICY IF EXISTS "Users can update own folder in attachments" ON storage.objects;
+CREATE POLICY "Users can update own folder in attachments"
+  ON storage.objects FOR UPDATE TO authenticated
+  USING (bucket_id = 'attachments' AND (storage.foldername(name))[1] = auth.uid()::text)
+  WITH CHECK (bucket_id = 'attachments' AND (storage.foldername(name))[1] = auth.uid()::text);
+```
+
+Ensure the **`attachments`** bucket exists (Storage → New bucket → name `attachments`, Public). Then try again.
+
+---
+
+## Troubleshooting: Storage upload returns 400 (POST to .../storage/v1/object/attachments/...)
+
+If the Supabase log shows **POST 400** to a URL like  
+`https://xxx.supabase.co/storage/v1/object/attachments/{userId}/invoices/{id}/0.jpg`,  
+the failure is **Storage** (uploading the file), not the `invoices` or `sales` table. Fix it as follows.
+
+1. **Create the bucket if it doesn’t exist**  
+   In Supabase: **Storage** → **New bucket** → name **`attachments`** → set to **Public** → Create.
+
+2. **Add RLS policies on Storage**  
+   Storage uses the `storage.objects` table. By default there is **no** INSERT permission, so uploads get 400. In the **SQL Editor** run:
+
+   ```sql
+   -- Allow authenticated users to upload only into their own folder: {user_id}/...
+   DROP POLICY IF EXISTS "Users can upload to own folder in attachments" ON storage.objects;
+   CREATE POLICY "Users can upload to own folder in attachments"
+     ON storage.objects FOR INSERT
+     TO authenticated
+     WITH CHECK (
+       bucket_id = 'attachments' AND (storage.foldername(name))[1] = auth.uid()::text
+     );
+
+   -- Allow update (e.g. upsert) in the same folder
+   DROP POLICY IF EXISTS "Users can update own folder in attachments" ON storage.objects;
+   CREATE POLICY "Users can update own folder in attachments"
+     ON storage.objects FOR UPDATE
+     TO authenticated
+     USING (bucket_id = 'attachments' AND (storage.foldername(name))[1] = auth.uid()::text)
+     WITH CHECK (bucket_id = 'attachments' AND (storage.foldername(name))[1] = auth.uid()::text);
+   ```
+
+   The app uploads to paths like `{userId}/invoices/{recordId}/0.jpg`, so the first path segment must equal the signed-in user’s ID.
+
+3. **Confirm you’re signed in**  
+   Uploads use the Supabase auth session. If the session is missing or expired, the request may fail. Ensure the user is logged in before adding an invoice/sale with photos.
+
+4. **React Native / Expo: request body**  
+   In React Native, `Blob` from `ArrayBuffer`/`Uint8Array` is not supported. The app uploads using **FormData** with the file **URI** (`{ uri, type, name }`) so the native layer streams the file in multipart/form-data. Rebuild or refresh the app so it uses the updated `attachmentStorage` code.
+
+After applying the SQL and (if needed) rebuilding, try adding an invoice with an image again.

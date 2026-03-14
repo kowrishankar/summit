@@ -1,15 +1,6 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import { supabase } from '../lib/supabase';
 
 const BUCKET = 'attachments';
-
-/** Decode base64 to Uint8Array for Supabase upload. */
-function base64ToUint8Array(base64: string): Uint8Array {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
 
 function getExtensionFromUri(uri: string, isPdf?: boolean): string {
   if (isPdf) return 'pdf';
@@ -30,6 +21,7 @@ function getContentType(ext: string): string {
 
 /**
  * Upload a single file from a local URI to Supabase Storage.
+ * Uses FormData with the file URI so React Native streams the file (no Blob/ArrayBuffer).
  * Path: {userId}/{type}/{recordId}/{filename}
  * Returns the public URL for the stored file (bucket must be public).
  */
@@ -44,14 +36,17 @@ export async function uploadAttachment(
   const ext = getExtensionFromUri(localUri, isPdf);
   const filename = `${index}.${ext}`;
   const path = `${userId}/${type}/${recordId}/${filename}`;
-
-  const base64 = await FileSystem.readAsStringAsync(localUri, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  const data = base64ToUint8Array(base64);
   const contentType = getContentType(ext);
 
-  const { error } = await supabase.storage.from(BUCKET).upload(path, data, {
+  // React Native FormData: append file by URI; native layer reads and streams it (no Blob/ArrayBuffer).
+  const formData = new FormData();
+  formData.append('', {
+    uri: localUri,
+    type: contentType,
+    name: filename,
+  } as unknown as Blob);
+
+  const { error } = await supabase.storage.from(BUCKET).upload(path, formData, {
     contentType,
     upsert: true,
   });
