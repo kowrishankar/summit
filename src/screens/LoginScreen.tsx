@@ -88,10 +88,10 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   input: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
-    color: '#f8fafc',
+    color: 'black',
     marginBottom: 16,
     fontSize: 16,
   },

@@ -30,14 +30,10 @@ export default function ForgotPasswordScreen({
     try {
       const result = await requestPasswordReset(email.trim());
       if (result.ok) {
-        if (result.token) {
-          navigation.navigate('ResetPassword', { token: result.token });
-        } else {
-          Alert.alert('Done', 'If an account exists, you will receive reset instructions by email.');
-          navigation.navigate('Login');
-        }
+        Alert.alert('Done', 'If an account exists, you will receive reset instructions by email. Open the link to set a new password.');
+        navigation.navigate('Login');
       } else {
-        Alert.alert('Error', 'No account found with this email.');
+        Alert.alert('Error', result.error ?? 'Something went wrong.');
       }
     } finally {
       setLoading(false);
@@ -50,7 +46,7 @@ export default function ForgotPasswordScreen({
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <Text style={styles.title}>Forgot password</Text>
-      <Text style={styles.subtitle}>Enter your email to receive a reset link (dev: token in console)</Text>
+      <Text style={styles.subtitle}>Enter your email to receive a reset link</Text>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -89,10 +85,10 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   input: {
-    backgroundColor: '#1e293b',
+    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
-    color: '#f8fafc',
+    color: 'black',
     marginBottom: 16,
     fontSize: 16,
   },

@@ -19,7 +19,9 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { useApp } from '../contexts/AppContext';
+import { useAuth } from '../contexts/AuthContext';
 import { extractFromText, extractFromImageBase64, extractFromMultipleImagesBase64, extractFromPdfBase64 } from '../services/invoiceExtraction';
+import { uploadAttachments } from '../services/attachmentStorage';
 import { renderPdfFirstPageToImageBase64 } from '../services/pdfText';
 import { formatAmount } from '../utils/currency';
 import type { ExtractedInvoiceData } from '../types';
@@ -31,7 +33,8 @@ export default function AddSaleScreen({
 }) {
   const insets = useSafeAreaInsets();
   const { height: winHeight } = useWindowDimensions();
-  const { addSale, addCategory, categories, sales, currentBusiness } = useApp();
+  const { user } = useAuth();
+  const { addSale, updateSale, addCategory, categories, sales, currentBusiness } = useApp();
   const [step, setStep] = useState<'choose' | 'preview' | 'extracting' | 'review' | 'edit' | 'saving'>('choose');
   const [extracted, setExtracted] = useState<ExtractedInvoiceData | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -276,15 +279,37 @@ export default function AddSaleScreen({
       const fileUriToSave = assetsForSave.length > 0 ? assetsForSave[0].uri : documentUri;
       const fileUrisToSave =
         assetsForSave.length > 1 ? assetsForSave.map((a) => a.uri) : undefined;
-      await addSale({
+      const urisToUpload = fileUrisToSave?.length
+        ? fileUrisToSave
+        : fileUriToSave
+          ? [fileUriToSave]
+          : [];
+
+      const newSale = await addSale({
         businessId: '',
         categoryId: resolvedCategoryId,
         source: fileName ? 'upload' : 'manual',
         fileName: fileName || undefined,
-        fileUri: fileUriToSave || undefined,
-        fileUris: fileUrisToSave,
+        fileUri: undefined,
+        fileUris: undefined,
         extracted,
       });
+
+      if (urisToUpload.length > 0 && user?.id) {
+        const isPdf = fileName?.toLowerCase().endsWith('.pdf');
+        const urls = await uploadAttachments(
+          user.id,
+          'sales',
+          newSale.id,
+          urisToUpload,
+          isPdf
+        );
+        await updateSale(newSale.id, {
+          fileUri: urls[0],
+          fileUris: urls.length > 1 ? urls : undefined,
+        });
+      }
+
       // Reset state so next time user opens Add they see the choose step, not previous sale
       setStep('choose');
       setExtracted(null);
@@ -296,7 +321,7 @@ export default function AddSaleScreen({
       setPendingImageAssets([]);
       setPreviewZoomVisible(false);
       setPreviewZoomIndex(0);
-      const tabNav = navigation.getParent?.();
+      const tabNav = navigation.getParent?.() as { navigate: (a: string, b?: { screen: string }) => void } | undefined;
       if (tabNav) tabNav.navigate('Records', { screen: 'SalesList' });
       else navigation.navigate('SalesList');
     } catch (e) {

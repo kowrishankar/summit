@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
+  SectionList,
   TouchableOpacity,
   TextInput,
   Alert,
@@ -13,6 +13,7 @@ import { useApp } from '../contexts/AppContext';
 import { useAddPreferred } from '../contexts/AddPreferredContext';
 import { formatAmount } from '../utils/currency';
 import { format } from 'date-fns';
+import { groupByReceiptDate } from '../utils/groupByReceiptDate';
 import type { Sale } from '../types';
 
 export default function SalesScreen({
@@ -33,6 +34,10 @@ export default function SalesScreen({
   );
 
   const filtered = searchSales(query, filterCategoryId ? { categoryId: filterCategoryId } : undefined);
+  const sections = useMemo(
+    () => groupByReceiptDate(filtered, (s) => s.extracted.date),
+    [filtered]
+  );
 
   const renderItem = ({ item }: { item: Sale }) => {
     const cat = categories.find((c) => c.id === item.categoryId);
@@ -93,11 +98,15 @@ export default function SalesScreen({
           </TouchableOpacity>
         ))}
       </View>
-      <FlatList
-        data={filtered}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
+        renderSectionHeader={({ section: { title } }) => (
+          <Text style={styles.sectionHeader}>{title}</Text>
+        )}
         contentContainerStyle={styles.list}
+        stickySectionHeadersEnabled={false}
         ListEmptyComponent={
           <Text style={styles.empty}>
             {sales.length === 0 ? 'No sales yet. Add one from the Add tab.' : 'No matches.'}
@@ -135,6 +144,15 @@ const styles = StyleSheet.create({
   chipText: { color: '#94a3b8', fontSize: 14 },
   chipTextActive: { color: '#fff', fontWeight: '600' },
   list: { padding: 16, paddingBottom: 80 },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94a3b8',
+    marginTop: 16,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',

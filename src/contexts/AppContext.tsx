@@ -1,9 +1,8 @@
 import React, { createContext, useContext, useCallback, useEffect, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import { storage } from '../services/storage';
-import type { BusinessAccount, Invoice, Sale, Category, ExtractedInvoiceData, InvoiceFilters } from '../types';
+import type { BusinessAccount, Invoice, Sale, Category, InvoiceFilters } from '../types';
 import { useAuth } from './AuthContext';
 import { startOfWeek, startOfMonth, startOfYear } from 'date-fns';
+import * as supabaseData from '../services/supabaseData';
 
 interface SpendSummary {
   week: number;
@@ -52,59 +51,56 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const loadBusinesses = useCallback(async () => {
     if (!user) return;
-    const all = await storage.getBusinessAccounts();
-    setBusinesses(all.filter((b) => b.userId === user.id));
-    const currentId = await storage.getCurrentBusinessId();
+    const all = await supabaseData.getBusinessAccounts(user.id);
+    setBusinesses(all);
+    const currentId = await supabaseData.getCurrentBusinessId(user.id);
     if (currentId) {
       const b = all.find((x) => x.id === currentId);
-      if (b && b.userId === user.id) setCurrentBusiness(b);
-      else setCurrentBusiness(all.filter((x) => x.userId === user.id)[0] ?? null);
+      if (b) setCurrentBusiness(b);
+      else setCurrentBusiness(all[0] ?? null);
     } else {
-      const first = all.filter((x) => x.userId === user.id)[0];
-      setCurrentBusiness(first ?? null);
-      if (first) await storage.setCurrentBusinessId(first.id);
+      const first = all[0] ?? null;
+      setCurrentBusiness(first);
+      if (first) await supabaseData.setCurrentBusinessId(user.id, first.id);
     }
   }, [user]);
 
   const loadInvoices = useCallback(async (businessId?: string) => {
     const bid = businessId ?? currentBusiness?.id;
-    const all = await storage.getInvoices();
     if (bid) {
-      setInvoices(all.filter((i) => i.businessId === bid));
-    } else {
-      setInvoices([]);
-    }
+      const list = await supabaseData.getInvoices(bid);
+      setInvoices(list);
+    } else setInvoices([]);
   }, [currentBusiness?.id]);
 
   const loadCategories = useCallback(async (businessId?: string) => {
     const bid = businessId ?? currentBusiness?.id;
-    const all = await storage.getCategories();
     if (bid) {
-      setCategories(all.filter((c) => c.businessId === bid));
-    } else {
-      setCategories([]);
-    }
+      const list = await supabaseData.getCategories(bid);
+      setCategories(list);
+    } else setCategories([]);
   }, [currentBusiness?.id]);
 
   const loadSales = useCallback(async (businessId?: string) => {
     const bid = businessId ?? currentBusiness?.id;
-    const all = await storage.getSales();
     if (bid) {
-      setSales(all.filter((s) => s.businessId === bid));
-    } else {
-      setSales([]);
-    }
+      const list = await supabaseData.getSales(bid);
+      setSales(list);
+    } else setSales([]);
   }, [currentBusiness?.id]);
 
-  const switchBusiness = useCallback(async (id: string) => {
-    await storage.setCurrentBusinessId(id);
-    const all = await storage.getBusinessAccounts();
-    const b = all.find((x) => x.id === id);
-    setCurrentBusiness(b ?? null);
-    await loadInvoices(id);
-    await loadSales(id);
-    await loadCategories(id);
-  }, [loadInvoices, loadSales, loadCategories]);
+  const switchBusiness = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      await supabaseData.setCurrentBusinessId(user.id, id);
+      const b = businesses.find((x) => x.id === id);
+      setCurrentBusiness(b ?? null);
+      await loadInvoices(id);
+      await loadSales(id);
+      await loadCategories(id);
+    },
+    [user, businesses, loadInvoices, loadSales, loadCategories]
+  );
 
   useEffect(() => {
     loadBusinesses();
@@ -125,122 +121,78 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addBusiness = useCallback(
     async (name: string, address?: string) => {
       if (!user) throw new Error('Not logged in');
-      const now = new Date().toISOString();
-      const all = await storage.getBusinessAccounts();
-      const newB: BusinessAccount = {
-        id: uuidv4(),
-        name: name.trim(),
-        address: address?.trim(),
-        userId: user.id,
-        createdAt: now,
-        updatedAt: now,
-      };
-      await storage.setBusinessAccounts([...all, newB]);
+      const newB = await supabaseData.addBusiness(user.id, name, address);
       setBusinesses((prev) => [...prev, newB]);
       if (!currentBusiness) {
         setCurrentBusiness(newB);
-        await storage.setCurrentBusinessId(newB.id);
+        await supabaseData.setCurrentBusinessId(user.id, newB.id);
       }
       return newB;
     },
     [user, currentBusiness]
   );
 
-  const updateBusiness = useCallback(async (id: string, patch: { name?: string; address?: string }) => {
-    const all = await storage.getBusinessAccounts();
-    const idx = all.findIndex((b) => b.id === id);
-    if (idx === -1) return;
-    const now = new Date().toISOString();
-    const updated: BusinessAccount = { ...all[idx], ...patch, updatedAt: now };
-    all[idx] = updated;
-    await storage.setBusinessAccounts(all);
-    setBusinesses((prev) => prev.map((b) => (b.id === id ? updated : b)));
-    if (currentBusiness?.id === id) setCurrentBusiness(updated);
-  }, [currentBusiness?.id]);
+  const updateBusiness = useCallback(
+    async (id: string, patch: { name?: string; address?: string }) => {
+      await supabaseData.updateBusiness(id, patch);
+      const updated = businesses.find((b) => b.id === id);
+      if (updated) {
+        const next = { ...updated, ...patch, updatedAt: new Date().toISOString() };
+        setBusinesses((prev) => prev.map((b) => (b.id === id ? next : b)));
+        if (currentBusiness?.id === id) setCurrentBusiness(next);
+      }
+    },
+    [businesses, currentBusiness?.id]
+  );
 
   const addInvoice = useCallback(
     async (inv: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
       if (!currentBusiness) throw new Error('No business selected');
-      const now = new Date().toISOString();
-      const newInv: Invoice = {
-        ...inv,
-        id: uuidv4(),
-        businessId: currentBusiness.id,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const all = await storage.getInvoices();
-      await storage.setInvoices([...all, newInv]);
-      setInvoices((prev) => [...prev, newInv]);
+      const newInv = await supabaseData.addInvoice(currentBusiness.id, inv);
+      setInvoices((prev) => [newInv, ...prev]);
       return newInv;
     },
     [currentBusiness]
   );
 
   const updateInvoice = useCallback(async (id: string, patch: Partial<Invoice>) => {
-    const all = await storage.getInvoices();
-    const idx = all.findIndex((i) => i.id === id);
-    if (idx === -1) return;
-    const updated = { ...all[idx], ...patch, updatedAt: new Date().toISOString() };
-    all[idx] = updated;
-    await storage.setInvoices(all);
-    setInvoices((prev) => prev.map((i) => (i.id === id ? updated : i)));
+    await supabaseData.updateInvoice(id, patch);
+    setInvoices((prev) =>
+      prev.map((i) => (i.id === id ? { ...i, ...patch, updatedAt: new Date().toISOString() } : i))
+    );
   }, []);
 
   const deleteInvoice = useCallback(async (id: string) => {
-    const all = await storage.getInvoices().then((list) => list.filter((i) => i.id !== id));
-    await storage.setInvoices(all);
+    await supabaseData.deleteInvoice(id);
     setInvoices((prev) => prev.filter((i) => i.id !== id));
   }, []);
 
   const addSale = useCallback(
     async (sale: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>) => {
       if (!currentBusiness) throw new Error('No business selected');
-      const now = new Date().toISOString();
-      const newSale: Sale = {
-        ...sale,
-        id: uuidv4(),
-        businessId: currentBusiness.id,
-        createdAt: now,
-        updatedAt: now,
-      };
-      const all = await storage.getSales();
-      await storage.setSales([...all, newSale]);
-      setSales((prev) => [...prev, newSale]);
+      const newSale = await supabaseData.addSale(currentBusiness.id, sale);
+      setSales((prev) => [newSale, ...prev]);
       return newSale;
     },
     [currentBusiness]
   );
 
   const updateSale = useCallback(async (id: string, patch: Partial<Sale>) => {
-    const all = await storage.getSales();
-    const idx = all.findIndex((s) => s.id === id);
-    if (idx === -1) return;
-    const updated = { ...all[idx], ...patch, updatedAt: new Date().toISOString() };
-    all[idx] = updated;
-    await storage.setSales(all);
-    setSales((prev) => prev.map((s) => (s.id === id ? updated : s)));
+    await supabaseData.updateSale(id, patch);
+    setSales((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...patch, updatedAt: new Date().toISOString() } : s))
+    );
   }, []);
 
   const deleteSale = useCallback(async (id: string) => {
-    const all = await storage.getSales().then((list) => list.filter((s) => s.id !== id));
-    await storage.setSales(all);
+    await supabaseData.deleteSale(id);
     setSales((prev) => prev.filter((s) => s.id !== id));
   }, []);
 
   const addCategory = useCallback(
     async (name: string, color?: string) => {
       if (!currentBusiness) throw new Error('No business selected');
-      const all = await storage.getCategories();
-      const newC: Category = {
-        id: uuidv4(),
-        businessId: currentBusiness.id,
-        name: name.trim(),
-        color: color ?? '#6366f1',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      await storage.setCategories([...all, newC]);
+      const newC = await supabaseData.addCategory(currentBusiness.id, name, color);
       setCategories((prev) => [...prev, newC]);
       return newC;
     },
@@ -248,24 +200,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   );
 
   const updateCategory = useCallback(async (id: string, patch: { name?: string; color?: string }) => {
-    const all = await storage.getCategories();
-    const idx = all.findIndex((c) => c.id === id);
-    if (idx === -1) return;
-    const updated = { ...all[idx], ...patch, updatedAt: new Date().toISOString() };
-    all[idx] = updated;
-    await storage.setCategories(all);
-    setCategories((prev) => prev.map((c) => (c.id === id ? updated : c)));
+    await supabaseData.updateCategory(id, patch);
+    setCategories((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: new Date().toISOString() } : c))
+    );
   }, []);
 
   const deleteCategory = useCallback(async (id: string) => {
-    const all = await storage.getCategories().then((list) => list.filter((c) => c.id !== id));
-    await storage.setInvoices(
-      (await storage.getInvoices()).map((i) => (i.categoryId === id ? { ...i, categoryId: null } : i))
-    );
-    await storage.setSales(
-      (await storage.getSales()).map((s) => (s.categoryId === id ? { ...s, categoryId: null } : s))
-    );
-    await storage.setCategories(all);
+    await supabaseData.deleteCategory(id);
     setInvoices((prev) => prev.map((i) => (i.categoryId === id ? { ...i, categoryId: null } : i)));
     setSales((prev) => prev.map((s) => (s.categoryId === id ? { ...s, categoryId: null } : s)));
     setCategories((prev) => prev.filter((c) => c.id !== id));
@@ -290,18 +232,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const m = filters.merchantName.toLowerCase();
         list = list.filter((i) => i.extracted.merchantName?.toLowerCase().includes(m));
       }
-      if (filters?.dateFrom) {
-        list = list.filter((i) => i.extracted.date >= filters.dateFrom!);
-      }
-      if (filters?.dateTo) {
-        list = list.filter((i) => i.extracted.date <= filters.dateTo!);
-      }
-      if (filters?.minAmount != null) {
-        list = list.filter((i) => i.extracted.amount >= filters!.minAmount!);
-      }
-      if (filters?.maxAmount != null) {
-        list = list.filter((i) => i.extracted.amount <= filters!.maxAmount!);
-      }
+      if (filters?.dateFrom) list = list.filter((i) => i.extracted.date >= filters.dateFrom!);
+      if (filters?.dateTo) list = list.filter((i) => i.extracted.date <= filters.dateTo!);
+      if (filters?.minAmount != null) list = list.filter((i) => i.extracted.amount >= filters!.minAmount!);
+      if (filters?.maxAmount != null) list = list.filter((i) => i.extracted.amount <= filters!.maxAmount!);
       return list;
     },
     [invoices]
@@ -326,18 +260,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const m = filters.merchantName.toLowerCase();
         list = list.filter((s) => s.extracted.merchantName?.toLowerCase().includes(m));
       }
-      if (filters?.dateFrom) {
-        list = list.filter((s) => s.extracted.date >= filters.dateFrom!);
-      }
-      if (filters?.dateTo) {
-        list = list.filter((s) => s.extracted.date <= filters.dateTo!);
-      }
-      if (filters?.minAmount != null) {
-        list = list.filter((s) => s.extracted.amount >= filters!.minAmount!);
-      }
-      if (filters?.maxAmount != null) {
-        list = list.filter((s) => s.extracted.amount <= filters!.maxAmount!);
-      }
+      if (filters?.dateFrom) list = list.filter((s) => s.extracted.date >= filters.dateFrom!);
+      if (filters?.dateTo) list = list.filter((s) => s.extracted.date <= filters.dateTo!);
+      if (filters?.minAmount != null) list = list.filter((s) => s.extracted.amount >= filters!.minAmount!);
+      if (filters?.maxAmount != null) list = list.filter((s) => s.extracted.amount <= filters!.maxAmount!);
       return list;
     },
     [sales]

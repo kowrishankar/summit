@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import type { User, Subscription } from '../types';
-import * as authService from '../services/auth';
-import { getSubscriptionForUser, hasActiveAccess } from '../services/subscription';
+import * as supabaseAuth from '../services/supabaseAuth';
+import { getSubscription, addBusiness, setCurrentBusinessId } from '../services/supabaseData';
+import { hasActiveAccess } from '../services/subscription';
 
 interface AuthContextValue {
   user: User | null;
@@ -29,9 +30,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   const loadSubscription = useCallback(async (userId: string): Promise<Subscription | null> => {
-    const sub = await getSubscriptionForUser(userId);
-    setSubscription(sub);
-    return sub;
+    try {
+      const sub = await getSubscription(userId);
+      setSubscription(sub);
+      return sub;
+    } catch {
+      setSubscription(null);
+      return null;
+    }
   }, []);
 
   const refreshSubscription = useCallback(
@@ -43,22 +49,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user?.id, loadSubscription]
   );
 
-  const loadUser = useCallback(async () => {
-    const u = await authService.getCurrentUser();
-    setUser(u);
-    if (u?.id) await loadSubscription(u.id);
-    setLoading(false);
-  }, [loadSubscription]);
-
   useEffect(() => {
-    loadUser();
-  }, [loadUser]);
+    let cancelled = false;
+    (async () => {
+      const session = await supabaseAuth.getSession();
+      if (cancelled) return;
+      setUser(session?.user ?? null);
+      if (session?.user?.id) await loadSubscription(session.user.id);
+      setLoading(false);
+    })();
+    const unsubscribe = supabaseAuth.onAuthStateChange((u) => {
+      if (!cancelled) {
+        setUser(u);
+        if (u?.id) loadSubscription(u.id);
+        else setSubscription(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, [loadSubscription]);
 
   const hasActiveSubscription = !!subscription && hasActiveAccess(subscription);
 
   const login = useCallback(
     async (email: string, password: string) => {
-      const u = await authService.login(email, password);
+      const u = await supabaseAuth.signIn(email, password);
       setUser(u);
       if (u?.id) await loadSubscription(u.id);
       return !!u;
@@ -74,9 +91,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       businessAddress?: string
     ) => {
       try {
-        const u = await authService.signup(email, password, businessName, businessAddress);
+        const u = await supabaseAuth.signUp(email, password, businessName, businessAddress);
         setUser(u);
-        if (u?.id) await loadSubscription(u.id);
+        if (u?.id) {
+          await loadSubscription(u.id);
+          if (businessName?.trim()) {
+            await addBusiness(u.id, businessName.trim(), businessAddress?.trim());
+            const businesses = await import('../services/supabaseData').then((m) =>
+              m.getBusinessAccounts(u.id)
+            );
+            const first = businesses[0];
+            if (first) await setCurrentBusinessId(u.id, first.id);
+          }
+        }
         return { ok: true };
       } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : 'Signup failed' };
@@ -86,16 +113,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 
   const logout = useCallback(async () => {
-    await authService.logout();
+    await supabaseAuth.signOut();
     setUser(null);
+    setSubscription(null);
   }, []);
 
   const requestPasswordReset = useCallback(async (email: string) => {
-    return authService.requestPasswordResetAsync(email);
+    const result = await supabaseAuth.requestPasswordReset(email);
+    if (result.ok) return { ok: true };
+    return { ok: false, error: result.error };
   }, []);
 
   const resetPassword = useCallback(async (token: string, newPassword: string) => {
-    return authService.resetPassword(token, newPassword);
+    const ok = await supabaseAuth.resetPasswordWithToken(token, newPassword);
+    if (ok) return true;
+    return supabaseAuth.updatePassword(newPassword).then((r) => r.ok);
   }, []);
 
   const value: AuthContextValue = {

@@ -32,9 +32,11 @@ export default function SubscribeScreen() {
         return;
       }
       const { clientSecret, customerId } = await createSetupIntent(user.email);
+      const returnURL = Platform.OS === 'web' ? undefined : 'summit://stripe-redirect';
       const { error: initError } = await initPaymentSheet({
         setupIntentClientSecret: clientSecret,
         merchantDisplayName: 'Summit',
+        returnURL,
       });
       if (initError) {
         Alert.alert('Error', initError.message ?? 'Could not initialize payment.');
@@ -53,9 +55,11 @@ export default function SubscribeScreen() {
       const subResponse = await createSubscription(customerId);
 
       if (subResponse.status === 'requires_payment' && subResponse.clientSecret) {
+        const returnURLPay = Platform.OS === 'web' ? undefined : 'summit://stripe-redirect';
         const { error: initPayError } = await initPaymentSheet({
           paymentIntentClientSecret: subResponse.clientSecret,
           merchantDisplayName: 'Summit',
+          returnURL: returnURLPay,
         });
         if (initPayError) {
           Alert.alert('Error', initPayError.message ?? 'Could not complete payment.');

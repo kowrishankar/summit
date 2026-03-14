@@ -18,13 +18,18 @@ React Native (Expo) app for **Android**, **iOS**, and **Web**: invoice and sales
    npm install
    ```
 
-2. **OpenAI (optional)**  
+2. **Supabase (required)**  
+   Auth and all data (users, businesses, invoices, sales, categories, subscriptions) are stored in [Supabase](https://supabase.com) so users can log in from any device and see the same data.
+   - Create a project at [supabase.com](https://supabase.com), then run the SQL schema from **docs/SUPABASE-SETUP.md**.
+   - In the project root `.env`, set `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (see `.env.example`). The legacy anon key is also supported as `EXPO_PUBLIC_SUPABASE_ANON_KEY`.
+
+3. **OpenAI (optional)**  
    For automatic extraction from invoice images/PDFs, set your API key:
    - Create `.env` in the project root (see `.env.example`).
    - Add: `EXPO_PUBLIC_OPENAI_API_KEY=sk-your-key`
    - Without it, the app still works: you get placeholder extraction and can add/edit manually.
 
-3. **Run**
+4. **Run**
    - Web: `npm run web`
    - iOS: `npm run ios`
    - Android: `npm run android`
@@ -34,14 +39,14 @@ React Native (Expo) app for **Android**, **iOS**, and **Web**: invoice and sales
 
 - `App.tsx` – Root: auth check, `AuthProvider`, `AppProvider`, navigator
 - `src/contexts/` – `AuthContext`, `AppContext` (businesses, invoices, categories)
-- `src/services/` – `storage`, `auth`, `invoiceExtraction` (OpenAI), `pdfText` (PDF text)
+- `src/services/` – `supabaseAuth`, `supabaseData`, `invoiceExtraction` (OpenAI), `pdfText` (PDF text)
 - `src/screens/` – Login, Signup, Forgot/Reset password, Home, Invoices, Vendors, Categories, Reports, Settings, Add Invoice, Invoice Detail, Business Switch
 - `src/navigation/` – Auth stack, Main tabs + stacks
 - `src/types/` – Shared TypeScript types
 
 ## Data
 
-Auth and invoice data are stored locally with `@react-native-async-storage/async-storage`. Replace `src/services/storage.ts` and your auth service with your backend when you add one.
+Auth and all app data (users, businesses, invoices, sales, categories, subscriptions) are stored in **Supabase** (PostgreSQL + Auth). Users can sign in from any device (phone, tablet, web) and see the same data. See **docs/SUPABASE-SETUP.md** for schema and setup.
 
 ## Extracted invoice fields
 

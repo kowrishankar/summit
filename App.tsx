@@ -1,30 +1,62 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { AppProvider } from './src/contexts/AppContext';
 import AuthStack from './src/navigation/AuthStack';
 import MainTabs from './src/navigation/MainTabs';
 import SubscribeScreen from './src/screens/SubscribeScreen';
+import SplashScreen from './src/components/SplashScreen';
+import OnboardingScreen from './src/screens/OnboardingScreen';
 
 const publishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+const ONBOARDING_SEEN_KEY = 'summit_onboarding_seen';
 
 function RootNavigator() {
   const { user, loading, hasActiveSubscription } = useAuth();
+  const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
+  const [initialAuthRoute, setInitialAuthRoute] = useState<'Login' | 'Signup'>('Login');
+
+  useEffect(() => {
+    if (user) return;
+    (async () => {
+      const seen = await AsyncStorage.getItem(ONBOARDING_SEEN_KEY);
+      setOnboardingSeen(seen === 'true');
+    })();
+  }, [user]);
+
+  const handleOnboardingSignUp = async () => {
+    await AsyncStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
+    setOnboardingSeen(true);
+    setInitialAuthRoute('Signup');
+  };
+
+  const handleOnboardingLogIn = async () => {
+    await AsyncStorage.setItem(ONBOARDING_SEEN_KEY, 'true');
+    setOnboardingSeen(true);
+    setInitialAuthRoute('Login');
+  };
 
   if (loading) {
-    return (
-      <View style={styles.loading}>
-        <ActivityIndicator size="large" color="#6366f1" />
-      </View>
-    );
+    return <SplashScreen />;
   }
 
   if (!user) {
-    return <AuthStack />;
+    if (onboardingSeen === null) {
+      return <SplashScreen />;
+    }
+    if (onboardingSeen === false) {
+      return (
+        <OnboardingScreen
+          onSignUp={handleOnboardingSignUp}
+          onLogIn={handleOnboardingLogIn}
+        />
+      );
+    }
+    return <AuthStack initialRouteName={initialAuthRoute} />;
   }
 
   if (!hasActiveSubscription) {
@@ -53,11 +85,3 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#0f172a',
-  },
-});
