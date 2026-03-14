@@ -16,12 +16,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
   },
   appName: {
     fontSize: 36,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#0f172a',
     letterSpacing: 0.5,
   },
   tagline: {

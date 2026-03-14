@@ -42,15 +42,15 @@ export default function VendorsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   list: { padding: 16 },
   row: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
   },
-  name: { fontSize: 16, fontWeight: '600', color: '#f8fafc' },
+  name: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
   meta: { fontSize: 13, color: '#94a3b8', marginTop: 4 },
   empty: { color: '#64748b', textAlign: 'center', marginTop: 40 },
 });

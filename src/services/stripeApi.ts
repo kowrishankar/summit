@@ -21,11 +21,12 @@ async function fetchWithTimeout(
             ' and your device can reach it (same Wi‑Fi, firewall allows port 4242).'
         );
       }
-      if (e.message?.includes('Network request failed') || e.message?.includes('Failed to fetch')) {
+      const msg = e.message?.toLowerCase() ?? '';
+      if (msg.includes('network request failed') || msg.includes('failed to fetch') || msg.includes('network error')) {
         throw new Error(
-          'Cannot reach the server at ' +
+          'Cannot reach the billing server at ' +
             API_URL +
-            '. Is it running? On a physical device, use your computer’s IP (e.g. http://192.168.4.25:4242).'
+            '. Start the server (npm run server in server folder). On a physical device, set EXPO_PUBLIC_STRIPE_API_URL in .env to your computer’s IP (e.g. http://192.168.1.5:4242).'
         );
       }
     }

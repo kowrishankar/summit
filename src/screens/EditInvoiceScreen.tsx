@@ -243,15 +243,15 @@ export default function EditInvoiceScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 20, paddingBottom: 40 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#e2e8f0', marginBottom: 16 },
+  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#334155', marginBottom: 16 },
   label: { fontSize: 14, color: '#94a3b8', marginBottom: 6 },
   input: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     padding: 14,
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 16,
     marginBottom: 16,
   },
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
   },
   chipActive: { backgroundColor: '#6366f1' },
   chipText: { color: '#94a3b8', fontSize: 14 },

@@ -170,7 +170,7 @@ export default function SubscribeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
   },
   scrollContent: {
     flexGrow: 1,
@@ -181,7 +181,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#0f172a',
     marginBottom: 6,
     textAlign: 'center',
   },
@@ -194,7 +194,7 @@ const styles = StyleSheet.create({
   },
   benefitsCard: {
     width: '100%',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 16,
     padding: 20,
     marginBottom: 24,
@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
   benefitsTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#e2e8f0',
+    color: '#334155',
     marginBottom: 16,
   },
   benefitRow: {
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#0f172a',
   },
   pricePeriod: {
     fontSize: 16,

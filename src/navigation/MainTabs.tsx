@@ -22,16 +22,16 @@ const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 const tabScreenOptions = {
-  headerStyle: { backgroundColor: '#0f172a' },
-  headerTintColor: '#f8fafc',
-  tabBarStyle: { backgroundColor: '#0f172a', borderTopColor: '#1e293b' },
-  tabBarActiveTintColor: '#818cf8',
+  headerStyle: { backgroundColor: '#ffffff' },
+  headerTintColor: '#0f172a',
+  tabBarStyle: { backgroundColor: '#ffffff', borderTopColor: '#e2e8f0' },
+  tabBarActiveTintColor: '#6366f1',
   tabBarInactiveTintColor: '#64748b',
 };
 
 function HomeStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#0f172a' }, headerTintColor: '#f8fafc' }}>
+    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}>
       <Stack.Screen name="HomeMain" component={HomeScreen} options={{ title: 'Dashboard' }} />
       <Stack.Screen name="BusinessSwitch" component={BusinessSwitchScreen} options={{ title: 'Switch business' }} />
     </Stack.Navigator>
@@ -41,7 +41,7 @@ function HomeStack() {
 function RecordsStack() {
   return (
     <Stack.Navigator
-      screenOptions={{ headerStyle: { backgroundColor: '#0f172a' }, headerTintColor: '#f8fafc' }}
+      screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}
       initialRouteName="InvoicesList"
     >
       <Stack.Screen name="InvoicesList" component={InvoicesScreen} options={{ title: 'Invoices' }} />
@@ -59,7 +59,7 @@ function RecordsStack() {
                 onPress={() => navigation.navigate('EditInvoice', { invoiceId: params.invoiceId })}
                 style={{ marginRight: 16 }}
               >
-                <Text style={{ color: '#818cf8', fontWeight: '600', fontSize: 16 }}>Edit</Text>
+                <Text style={{ color: '#6366f1', fontWeight: '600', fontSize: 16 }}>Edit</Text>
               </TouchableOpacity>
             );
           },
@@ -73,7 +73,7 @@ function RecordsStack() {
 
 function AddStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#0f172a' }, headerTintColor: '#f8fafc' }}>
+    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}>
       <Stack.Screen name="AddChoice" component={AddChoiceScreen} options={{ title: 'Add' }} />
       <Stack.Screen name="AddInvoiceRoot" component={AddInvoiceScreen} options={{ title: 'Add invoice' }} />
       <Stack.Screen name="AddSaleRoot" component={AddSaleScreen} options={{ title: 'Add sale' }} />
@@ -133,7 +133,7 @@ const popupStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   popup: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 12,
     borderTopRightRadius: 12,
     paddingVertical: 8,
@@ -141,7 +141,7 @@ const popupStyles = StyleSheet.create({
     marginHorizontal: 12,
     marginBottom: 70,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: '#e2e8f0',
   },
   option: {
     flexDirection: 'row',
@@ -154,7 +154,7 @@ const popupStyles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#f8fafc',
+    color: '#0f172a',
   },
 });
 
@@ -227,8 +227,8 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
 const tabBarStyles = StyleSheet.create({
   tabBarContainer: {
     flexDirection: 'row',
-    backgroundColor: '#0f172a',
-    borderTopColor: '#1e293b',
+    backgroundColor: '#ffffff',
+    borderTopColor: '#e2e8f0',
     borderTopWidth: 1,
     paddingBottom: 24,
     paddingTop: 8,

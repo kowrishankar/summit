@@ -107,7 +107,7 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
   },
   slide: {
     flex: 1,
@@ -127,7 +127,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#0f172a',
     textAlign: 'center',
     marginBottom: 12,
   },
@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
   primaryButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#fff',
   },
   secondaryButton: {
     paddingVertical: 12,
@@ -189,6 +189,6 @@ const styles = StyleSheet.create({
   nextButtonText: {
     fontSize: 17,
     fontWeight: '600',
-    color: '#0f172a',
+    color: '#fff',
   },
 });

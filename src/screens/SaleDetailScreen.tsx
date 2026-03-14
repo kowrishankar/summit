@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   Animated,
+  Easing,
   PanResponder,
   Alert,
   Platform,
@@ -38,8 +39,8 @@ export default function SaleDetailScreen({
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [pdfExpanded, setPdfExpanded] = useState(false);
 
-  // Sheet must stop below the page title so content and handle stay visible
-  const maxPanelH = winHeight - insets.top - HEADER_RESERVED;
+  // Sheet must stop below the page title; cap at 80% of screen so drag-down is always possible
+  const maxPanelH = Math.min(winHeight - insets.top - HEADER_RESERVED, winHeight * 0.8);
   const minPanelH = HANDLE_HEIGHT;
 
   const panelHeight = useRef(new Animated.Value(HANDLE_HEIGHT)).current;
@@ -57,7 +58,7 @@ export default function SaleDetailScreen({
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 5,
+      onMoveShouldSetPanResponder: (_, g) => Math.abs(g.dy) > 2,
       onPanResponderGrant: () => {
         const maxH = maxPanelHRef.current;
         const minH = minPanelHRef.current;
@@ -78,11 +79,11 @@ export default function SaleDetailScreen({
         const snapToExpanded = current > maxH * 0.55 || gestureState.vy < -0.2;
         const target = snapToExpanded ? maxH : minH;
         panelHeightRef.current = target;
-        Animated.spring(panelHeight, {
+        Animated.timing(panelHeight, {
           toValue: target,
+          duration: 220,
           useNativeDriver: false,
-          speed: 24,
-          bounciness: 8,
+          easing: Easing.out(Easing.cubic),
         }).start(() => {
           panelHeightRef.current = target;
         });
@@ -277,7 +278,7 @@ export default function SaleDetailScreen({
           visible={imageViewerVisible}
           onRequestClose={() => setImageViewerVisible(false)}
           doubleTapToZoomEnabled
-          backgroundColor="#0f172a"
+          backgroundColor="#ffffff"
           FooterComponent={({ imageIndex }) => (
             <TouchableOpacity
               style={styles.fullscreenCloseButton}
@@ -326,18 +327,18 @@ export default function SaleDetailScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   empty: { color: '#94a3b8', textAlign: 'center', marginTop: 40 },
   docContainer: {
     width: '100%',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
   },
   imageTouchable: { flex: 1, width: '100%' },
   docScroll: { flex: 1, width: '100%' },
   docScrollContent: { paddingBottom: 16 },
   docSectionWrap: {
     marginBottom: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 8,
     overflow: 'hidden',
   },
@@ -347,7 +348,7 @@ const styles = StyleSheet.create({
     color: '#94a3b8',
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
   },
   docSectionImage: { width: '100%', height: 280 },
   docImage: { width: '100%', height: '100%' },
@@ -371,7 +372,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 24,
   },
-  fullscreenCloseText: { fontSize: 16, color: '#f8fafc', fontWeight: '600' },
+  fullscreenCloseText: { fontSize: 16, color: '#0f172a', fontWeight: '600' },
   pdfPlaceholder: {
     flex: 1,
     justifyContent: 'center',
@@ -382,12 +383,12 @@ const styles = StyleSheet.create({
   pdfWebViewContainer: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
   },
   pdfWebView: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
   },
   expandPdfButton: {
     position: 'absolute',
@@ -403,12 +404,12 @@ const styles = StyleSheet.create({
   },
   pdfFullScreenContainer: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
   },
   pdfFullScreenWebView: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
   },
   pdfExitButton: {
     position: 'absolute',
@@ -421,7 +422,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 12,
   },
-  pdfExitButtonText: { fontSize: 16, color: '#f8fafc', fontWeight: '600' },
+  pdfExitButtonText: { fontSize: 16, color: '#0f172a', fontWeight: '600' },
   viewPdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -432,7 +433,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#3b82f6',
     borderRadius: 10,
   },
-  viewPdfButtonText: { fontSize: 16, color: '#f8fafc', fontWeight: '600' },
+  viewPdfButtonText: { fontSize: 16, color: '#0f172a', fontWeight: '600' },
   noDocPlaceholder: {
     flex: 1,
     justifyContent: 'center',

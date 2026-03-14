@@ -85,20 +85,20 @@ export default function BusinessSwitchScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
-  title: { fontSize: 20, fontWeight: '700', color: '#f8fafc', padding: 20 },
+  container: { flex: 1, backgroundColor: '#ffffff' },
+  title: { fontSize: 20, fontWeight: '700', color: '#0f172a', padding: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 80 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     padding: 16,
     marginBottom: 10,
   },
   rowActive: { borderWidth: 2, borderColor: '#6366f1' },
-  name: { fontSize: 16, color: '#f8fafc' },
+  name: { fontSize: 16, color: '#0f172a' },
   badge: { fontSize: 12, color: '#6366f1', fontWeight: '600' },
   fab: {
     position: 'absolute',
@@ -117,13 +117,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 24,
   },
-  modal: { backgroundColor: '#1e293b', borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '600', color: '#f8fafc', marginBottom: 16 },
+  modal: { backgroundColor: '#f1f5f9', borderRadius: 16, padding: 24 },
+  modalTitle: { fontSize: 18, fontWeight: '600', color: '#0f172a', marginBottom: 16 },
   input: {
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     borderRadius: 12,
     padding: 14,
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 16,
     marginBottom: 20,
   },

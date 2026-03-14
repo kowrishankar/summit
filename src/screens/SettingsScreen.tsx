@@ -121,7 +121,15 @@ export default function SettingsScreen() {
       const { url } = await createPortalSession(subscription.stripeCustomerId, returnUrl);
       await Linking.openURL(url);
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not open billing portal.');
+      const message =
+        e instanceof Error ? e.message : 'Could not open billing portal.';
+      Alert.alert(
+        'Cannot open billing',
+        message +
+          (message.includes('billing server')
+            ? ''
+            : '\n\nIf you see a network error, start the server (server folder) and use your computer’s IP in .env for EXPO_PUBLIC_STRIPE_API_URL when on a physical device.')
+      );
     } finally {
       setPortalLoading(false);
     }
@@ -245,18 +253,18 @@ export default function SettingsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   scroll: { padding: 20, paddingBottom: 40 },
   section: { marginBottom: 28 },
   label: { fontSize: 12, color: '#94a3b8', marginBottom: 4 },
-  value: { fontSize: 16, color: '#f8fafc' },
-  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#e2e8f0', marginBottom: 4 },
+  value: { fontSize: 16, color: '#0f172a' },
+  sectionTitle: { fontSize: 16, fontWeight: '600', color: '#334155', marginBottom: 4 },
   hint: { fontSize: 13, color: '#94a3b8', marginBottom: 12 },
   input: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     padding: 14,
-    color: '#f8fafc',
+    color: '#0f172a',
     fontSize: 16,
     marginBottom: 12,
   },
@@ -273,16 +281,16 @@ const styles = StyleSheet.create({
   subLoader: { marginVertical: 12 },
   subRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
   subLabel: { fontSize: 14, color: '#94a3b8' },
-  subValue: { fontSize: 15, color: '#f8fafc', fontWeight: '500' },
+  subValue: { fontSize: 15, color: '#0f172a', fontWeight: '500' },
   manageBillingButton: {
     marginTop: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
     alignItems: 'center',
     borderRadius: 12,
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
   },
-  manageBillingButtonText: { color: '#e2e8f0', fontSize: 15, fontWeight: '600' },
+  manageBillingButtonText: { color: '#334155', fontSize: 15, fontWeight: '600' },
   cancelSubButton: {
     marginTop: 12,
     paddingVertical: 12,
@@ -295,7 +303,7 @@ const styles = StyleSheet.create({
   cancelSubButtonText: { color: '#ef4444', fontSize: 15, fontWeight: '600' },
   cancelNote: { fontSize: 13, color: '#94a3b8', marginTop: 12, fontStyle: 'italic' },
   logoutButton: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

@@ -175,16 +175,16 @@ export default function ReportsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#0f172a' },
+  container: { flex: 1, backgroundColor: '#ffffff' },
   content: { padding: 20 },
-  title: { fontSize: 24, fontWeight: '700', color: '#f8fafc', marginBottom: 20 },
+  title: { fontSize: 24, fontWeight: '700', color: '#0f172a', marginBottom: 20 },
   card: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     padding: 20,
     marginBottom: 16,
   },
-  cardTitle: { fontSize: 16, fontWeight: '600', color: '#e2e8f0', marginBottom: 12 },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: '#334155', marginBottom: 12 },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -193,7 +193,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#334155',
   },
   summaryLabel: { color: '#94a3b8' },
-  summaryValue: { color: '#f8fafc', fontWeight: '600' },
+  summaryValue: { color: '#0f172a', fontWeight: '600' },
   summaryValueIncome: { color: '#22c55e', fontWeight: '600' },
   netPositive: { color: '#22c55e', fontWeight: '600' },
   netNegative: { color: '#ef4444', fontWeight: '600' },

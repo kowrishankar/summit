@@ -90,12 +90,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#0f172a',
     marginBottom: 8,
   },
   subtitle: {
@@ -104,10 +104,10 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   input: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 12,
     padding: 16,
-    color: '#f8fafc',
+    color: '#0f172a',
     marginBottom: 16,
     fontSize: 16,
   },

@@ -45,13 +45,13 @@ export default function AddChoiceScreen({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
     paddingHorizontal: 24,
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#0f172a',
     marginBottom: 4,
   },
   subtitle: {
@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   card: {
-    backgroundColor: '#1e293b',
+    backgroundColor: '#f1f5f9',
     borderRadius: 16,
     padding: 24,
     marginBottom: 16,
@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#f8fafc',
+    color: '#0f172a',
     marginBottom: 4,
   },
   cardDesc: {

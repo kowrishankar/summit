@@ -74,12 +74,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     padding: 24,
-    backgroundColor: '#0f172a',
+    backgroundColor: '#ffffff',
   },
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#f8fafc',
+    color: '#0f172a',
     marginBottom: 8,
   },
   subtitle: {
