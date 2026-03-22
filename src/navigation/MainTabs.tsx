@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { TouchableOpacity, View, StyleSheet, Modal, Pressable } from 'react-native';
+import {
+  TouchableOpacity,
+  View,
+  StyleSheet,
+  Modal,
+  Pressable,
+  Platform,
+} from 'react-native';
 import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -12,7 +19,6 @@ import SalesScreen from '../screens/SalesScreen';
 import SaleDetailScreen from '../screens/SaleDetailScreen';
 import ReportsScreen from '../screens/ReportsScreen';
 import SettingsScreen from '../screens/SettingsScreen';
-import AddChoiceScreen from '../screens/AddChoiceScreen';
 import AddInvoiceScreen from '../screens/AddInvoiceScreen';
 import AddSaleScreen from '../screens/AddSaleScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
@@ -74,8 +80,10 @@ function RecordsStack() {
 
 function AddStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}>
-      <Stack.Screen name="AddChoice" component={AddChoiceScreen} options={{ title: 'Add' }} />
+    <Stack.Navigator
+      initialRouteName="AddInvoiceRoot"
+      screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}
+    >
       <Stack.Screen name="AddInvoiceRoot" component={AddInvoiceScreen} options={{ title: 'Add invoice' }} />
       <Stack.Screen name="AddSaleRoot" component={AddSaleScreen} options={{ title: 'Add sale' }} />
     </Stack.Navigator>
@@ -99,28 +107,71 @@ function RecordsTabBarPopup({
     <Modal visible={visible} transparent animationType="fade">
       <Pressable style={popupStyles.backdrop} onPress={onClose}>
         <View style={popupStyles.popup} onStartShouldSetResponder={() => true}>
-          <TouchableOpacity
-            style={popupStyles.option}
+          <Pressable
+            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
+            android_ripple={{ color: 'rgba(99, 102, 241, 0.2)' }}
             onPress={() => {
               onSelectInvoices();
               onClose();
             }}
-            activeOpacity={0.7}
           >
             <Ionicons name="document-text-outline" size={20} color="#818cf8" />
             <AppText style={popupStyles.optionText}>Invoices</AppText>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={popupStyles.option}
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
+            android_ripple={{ color: 'rgba(34, 197, 94, 0.22)' }}
             onPress={() => {
               onSelectSales();
               onClose();
             }}
-            activeOpacity={0.7}
           >
             <Ionicons name="trending-up-outline" size={20} color="#22c55e" />
             <AppText style={popupStyles.optionText}>Sales</AppText>
-          </TouchableOpacity>
+          </Pressable>
+        </View>
+      </Pressable>
+    </Modal>
+  );
+}
+
+function AddTabBarPopup({
+  visible,
+  onClose,
+  onSelectInvoice,
+  onSelectSale,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSelectInvoice: () => void;
+  onSelectSale: () => void;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <Pressable style={popupStyles.backdrop} onPress={onClose}>
+        <View style={popupStyles.popup} onStartShouldSetResponder={() => true}>
+          <Pressable
+            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
+            android_ripple={{ color: 'rgba(99, 102, 241, 0.2)' }}
+            onPress={() => {
+              onSelectInvoice();
+              onClose();
+            }}
+          >
+            <Ionicons name="document-text-outline" size={20} color="#818cf8" />
+            <AppText style={popupStyles.optionText}>Add invoice</AppText>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
+            android_ripple={{ color: 'rgba(34, 197, 94, 0.22)' }}
+            onPress={() => {
+              onSelectSale();
+              onClose();
+            }}
+          >
+            <Ionicons name="trending-up-outline" size={20} color="#22c55e" />
+            <AppText style={popupStyles.optionText}>Add sale</AppText>
+          </Pressable>
         </View>
       </Pressable>
     </Modal>
@@ -151,6 +202,10 @@ const popupStyles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderRadius: 10,
+    overflow: 'hidden',
+  },
+  optionPressed: {
+    backgroundColor: 'rgba(15, 23, 42, 0.06)',
   },
   optionText: {
     fontSize: 16,
@@ -161,6 +216,7 @@ const popupStyles = StyleSheet.create({
 
 function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Navigator']>['tabBar']) {
   const [recordsPopupVisible, setRecordsPopupVisible] = useState(false);
+  const [addPopupVisible, setAddPopupVisible] = useState(false);
   const insets = useSafeAreaInsets();
   const { state, navigation, descriptors } = props as {
     state: { index: number; routeNames: string[] };
@@ -175,13 +231,28 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
     navigation.navigate(RECORDS_TAB_NAME, { screen: 'SalesList' });
   };
 
+  const selectAddInvoice = () => {
+    navigation.navigate('Add', { screen: 'AddInvoiceRoot' });
+  };
+  const selectAddSale = () => {
+    navigation.navigate('Add', { screen: 'AddSaleRoot' });
+  };
+
   return (
     <>
       <View style={[tabBarStyles.tabBarContainer, { paddingBottom: Math.max(8, insets.bottom) }]}>
         {state.routeNames.map((name, index) => {
           const isRecords = name === RECORDS_TAB_NAME;
+          const isAdd = name === 'Add';
           const isFocused = state.index === index;
-          const label = name === 'Dashboard' ? 'Home' : name === RECORDS_TAB_NAME ? 'Invoices & Sales' : name;
+          const label =
+            name === 'Dashboard'
+              ? 'Home'
+              : name === RECORDS_TAB_NAME
+                ? 'View records'
+                : name === 'Add'
+                  ? 'Add'
+                  : name;
           const iconName =
             name === 'Dashboard'
               ? 'home'
@@ -197,21 +268,30 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
           const color = isFocused ? '#818cf8' : '#64748b';
 
           return (
-            <TouchableOpacity
+            <Pressable
               key={name}
-              style={tabBarStyles.tab}
+              accessibilityRole="button"
+              accessibilityState={{ selected: isFocused }}
+              accessibilityLabel={label}
+              hitSlop={8}
+              style={({ pressed }) => [
+                tabBarStyles.tab,
+                (Platform.OS === 'ios' || Platform.OS === 'web') && pressed && tabBarStyles.tabPressed,
+              ]}
+              android_ripple={{ color: 'rgba(99, 102, 241, 0.22)', foreground: true }}
               onPress={() => {
                 if (isRecords) {
                   setRecordsPopupVisible(true);
+                } else if (isAdd) {
+                  setAddPopupVisible(true);
                 } else {
                   navigation.navigate(name);
                 }
               }}
-              activeOpacity={0.7}
             >
               <Ionicons name={iconName as 'home'} size={name === 'Add' ? 28 : 24} color={color} />
               <AppText style={[tabBarStyles.label, { color }]}>{label}</AppText>
-            </TouchableOpacity>
+            </Pressable>
           );
         })}
       </View>
@@ -220,6 +300,12 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
         onClose={() => setRecordsPopupVisible(false)}
         onSelectInvoices={selectInvoices}
         onSelectSales={selectSales}
+      />
+      <AddTabBarPopup
+        visible={addPopupVisible}
+        onClose={() => setAddPopupVisible(false)}
+        onSelectInvoice={selectAddInvoice}
+        onSelectSale={selectAddSale}
       />
     </>
   );
@@ -238,6 +324,13 @@ const tabBarStyles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 6,
+    marginHorizontal: 2,
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  tabPressed: {
+    backgroundColor: 'rgba(99, 102, 241, 0.12)',
   },
   label: {
     fontSize: 11,

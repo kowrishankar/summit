@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
   benefitText: {
     flex: 1,
     fontSize: 14,
-    color: '#cbd5e1',
+    color: 'black',
     lineHeight: 20,
   },
   priceBlock: {
