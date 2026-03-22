@@ -11,6 +11,17 @@ import {
 import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import type { BusinessAccount } from '../types';
+import {
+  BORDER,
+  CARD_BG,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+  shadowCardLight,
+} from '../theme/design';
 
 export default function BusinessSwitchScreen({
   navigation,
@@ -67,7 +78,7 @@ export default function BusinessSwitchScreen({
               placeholder="Business name"
               value={newName}
               onChangeText={setNewName}
-              placeholderTextColor="#64748b"
+              placeholderTextColor={TEXT_MUTED}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setModalVisible(false)}>
@@ -85,51 +96,56 @@ export default function BusinessSwitchScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  title: { fontSize: 20, fontWeight: '700', color: '#0f172a', padding: 20 },
+  container: { flex: 1, backgroundColor: PAGE_BG },
+  title: { fontSize: 20, fontWeight: '700', color: TEXT, padding: 20 },
   list: { paddingHorizontal: 20, paddingBottom: 80 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
-  rowActive: { borderWidth: 2, borderColor: '#6366f1' },
-  name: { fontSize: 16, color: '#0f172a' },
-  badge: { fontSize: 12, color: '#6366f1', fontWeight: '600' },
+  rowActive: { borderWidth: 2, borderColor: PRIMARY },
+  name: { fontSize: 16, fontWeight: '600', color: TEXT },
+  badge: { fontSize: 12, color: PRIMARY, fontWeight: '700' },
   fab: {
     position: 'absolute',
     bottom: 24,
     left: 20,
     right: 20,
-    backgroundColor: '#6366f1',
+    backgroundColor: PRIMARY,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
   },
-  fabText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15,23,42,0.45)',
     justifyContent: 'center',
     padding: 24,
   },
-  modal: { backgroundColor: '#f1f5f9', borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '600', color: '#0f172a', marginBottom: 16 },
+  modal: { backgroundColor: CARD_BG, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: BORDER },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: TEXT, marginBottom: 16 },
   input: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: MUTED_CARD,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
     padding: 14,
-    color: '#0f172a',
+    color: TEXT,
     fontSize: 16,
     marginBottom: 20,
   },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
   modalBtn: { paddingVertical: 10, paddingHorizontal: 16 },
-  modalBtnText: { color: '#94a3b8' },
-  modalBtnPrimary: { backgroundColor: '#6366f1', borderRadius: 8 },
-  modalBtnTextPrimary: { color: '#fff', fontWeight: '600' },
+  modalBtnText: { color: TEXT_SECONDARY, fontWeight: '600' },
+  modalBtnPrimary: { backgroundColor: PRIMARY, borderRadius: 12 },
+  modalBtnTextPrimary: { color: '#fff', fontWeight: '700' },
 });

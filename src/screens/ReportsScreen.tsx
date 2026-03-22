@@ -1,11 +1,5 @@
 import React, { useMemo } from 'react';
-import {
-  View,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,20 +15,21 @@ import {
   subMonths,
   startOfYear,
 } from 'date-fns';
-
-/** Design-inspired palette */
-const PURPLE = '#7B61FF';
-const PURPLE_DEEP = '#5B4CCC';
-const LAVENDER = '#D4D1FF';
-const LAVENDER_SOFT = '#E8E6FF';
-const GREEN = '#22c55e';
-const GREEN_MUTED = '#4ade80';
-const PAGE_BG = '#F5F6FA';
-const CARD_BG = '#FFFFFF';
-const MUTED_CARD = '#F8F9FE';
-const BORDER = '#E8E9F0';
-const TEXT = '#0f172a';
-const TEXT_MUTED = '#64748b';
+import {
+  BORDER,
+  CARD_BG,
+  GREEN,
+  GREEN_MUTED,
+  LAVENDER,
+  LAVENDER_SOFT,
+  MUTED_CARD,
+  PAGE_BG,
+  PURPLE,
+  PURPLE_DEEP,
+  TEXT,
+  TEXT_MUTED,
+  shadowCard,
+} from '../theme/design';
 
 const DONUT_SIZE = 200;
 const DONUT_R = DONUT_SIZE / 2;
@@ -445,15 +440,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#1e1b4b',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 12,
-      },
-      android: { elevation: 3 },
-    }),
+    ...shadowCard,
   },
   cardTitle: {
     fontSize: 16,

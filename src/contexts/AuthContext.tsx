@@ -18,7 +18,7 @@ interface AuthContextValue {
     businessAddress?: string
   ) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
-  requestPasswordReset: (email: string) => Promise<{ ok: boolean; token?: string }>;
+  requestPasswordReset: (email: string) => Promise<{ ok: boolean; token?: string; error?: string }>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
 }
 

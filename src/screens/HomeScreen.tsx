@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Text,
   Alert,
-  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +16,31 @@ import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAddPreferred } from '../contexts/AddPreferredContext';
 import { formatAmount } from '../utils/currency';
+import {
+  BORDER,
+  CARD_BG,
+  GREEN,
+  LAVENDER_SOFT,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  PURPLE_DEEP,
+  RED,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+  shadowCard,
+  shadowCardLight,
+} from '../theme/design';
+
+/** Quick Actions — match home design (pastel tiles + accent icons) */
+const QUICK_SCAN_BG = '#F5F3FF';
+const QUICK_SCAN_ICON = '#4338CA';
+const QUICK_EXPENSE_BG = '#FFFBEB';
+const QUICK_EXPENSE_GOLD = '#F59E0B';
+/** Add Sale — greener mint tile + emerald cart (aligned with reference) */
+const QUICK_SALE_BG = '#ECFDF5';
+const QUICK_SALE_GREEN = '#059669';
 
 function formatHelloName(email: string | undefined): string {
   if (!email) return 'there';
@@ -231,7 +255,7 @@ export default function HomeScreen({
           onPress={() => Alert.alert('Summit', 'Rewards and tips are coming soon.')}
           activeOpacity={0.7}
         >
-          <Ionicons name="gift-outline" size={22} color="#4F46E5" />
+          <Ionicons name="gift-outline" size={22} color={PRIMARY} />
         </TouchableOpacity>
       </View>
 
@@ -242,8 +266,8 @@ export default function HomeScreen({
         activeOpacity={0.92}
       >
         <View style={styles.balanceRow}>
-          <LinearGradient colors={['#EDE7F6', '#E8E0F5']} style={styles.balanceIconCircle}>
-            <Ionicons name="wallet-outline" size={28} color="#5B4FC9" />
+          <LinearGradient colors={[LAVENDER_SOFT, '#E8E0F5']} style={styles.balanceIconCircle}>
+            <Ionicons name="wallet-outline" size={28} color={PURPLE_DEEP} />
           </LinearGradient>
           <View style={styles.balanceCenter}>
             <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
@@ -253,42 +277,42 @@ export default function HomeScreen({
             <Text style={styles.balanceHint}>This month · net (income − expenses)</Text>
             <View style={styles.progressTrack}>
               <LinearGradient
-                colors={['#F5C6CB', '#CE93D8']}
+                colors={['#B8AFFF', PRIMARY]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={[styles.progressFill, { width: `${expenseBarPct}%` }]}
               />
             </View>
           </View>
-          <Ionicons name="chevron-forward" size={22} color="#B2BEC3" />
+          <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
         </View>
       </TouchableOpacity>
 
-      {/* Quick actions */}
-      <AppText style={styles.sectionHeading}>Quick Actions</AppText>
-      <View style={styles.quickActionsRow}>
-        <TouchableOpacity style={styles.quickActionCell} onPress={goAddInvoice} activeOpacity={0.85}>
-          <View style={[styles.quickActionIconWrap, styles.quickScan]}>
-            <Ionicons name="scan-outline" size={28} color="#3949AB" />
-          </View>
-          <AppText style={styles.quickActionLabel}>Scan Receipt</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickActionCell} onPress={goAddInvoice} activeOpacity={0.85}>
-          <View style={[styles.quickActionIconWrap, styles.quickExpense]}>
-            <View style={styles.orangeCircle}>
-              <Ionicons name="add" size={26} color="#FFFFFF" />
+      {/* Quick actions — white card + pastel tiles per design */}
+      <View style={styles.quickActionsCard}>
+        <AppText style={styles.quickActionsTitle}>Quick Actions</AppText>
+        <View style={styles.quickActionsRow}>
+          <TouchableOpacity style={styles.quickActionCell} onPress={goAddInvoice} activeOpacity={0.85}>
+            <View style={[styles.quickActionIconWrap, { backgroundColor: QUICK_SCAN_BG }]}>
+              <Ionicons name="scan-outline" size={28} color={QUICK_SCAN_ICON} />
             </View>
-          </View>
-          <AppText style={styles.quickActionLabel}>Add Expense</AppText>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickActionCell} onPress={goAddSale} activeOpacity={0.85}>
-          <View style={[styles.quickActionIconWrap, styles.quickSale]}>
-            <View style={styles.tealCircle}>
-              <Ionicons name="cart-outline" size={24} color="#FFFFFF" />
+            <AppText style={styles.quickActionLabel}>Scan Receipt</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCell} onPress={goAddInvoice} activeOpacity={0.85}>
+            <View style={[styles.quickActionIconWrap, { backgroundColor: QUICK_EXPENSE_BG }]}>
+              <View style={[styles.expenseGoldCircle, { backgroundColor: QUICK_EXPENSE_GOLD }]}>
+                <Ionicons name="add" size={26} color="#FFFFFF" />
+              </View>
             </View>
-          </View>
-          <AppText style={styles.quickActionLabel}>Add Sale</AppText>
-        </TouchableOpacity>
+            <AppText style={styles.quickActionLabel}>Add Expense</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickActionCell} onPress={goAddSale} activeOpacity={0.85}>
+            <View style={[styles.quickActionIconWrap, { backgroundColor: QUICK_SALE_BG }]}>
+              <Ionicons name="cart-outline" size={28} color={QUICK_SALE_GREEN} />
+            </View>
+            <AppText style={styles.quickActionLabel}>Add Sale</AppText>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Recent activity */}
@@ -317,7 +341,7 @@ export default function HomeScreen({
                   {row.title}
                 </AppText>
                 {row.verified ? (
-                  <Ionicons name="checkmark-circle" size={18} color="#22c55e" style={styles.verifiedCheck} />
+                  <Ionicons name="checkmark-circle" size={18} color={GREEN} style={styles.verifiedCheck} />
                 ) : null}
               </View>
               <AppText style={styles.activitySubtitle} numberOfLines={1}>
@@ -342,7 +366,7 @@ export default function HomeScreen({
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: '#F7F8FA',
+    backgroundColor: PAGE_BG,
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -360,44 +384,28 @@ const styles = StyleSheet.create({
   helloName: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#2D3436',
+    color: TEXT,
     marginBottom: 4,
   },
   businessSub: {
     fontSize: 15,
-    color: '#636E72',
+    color: TEXT_MUTED,
   },
   giftBtn: {
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: '#E8EAF6',
+    backgroundColor: MUTED_CARD,
     alignItems: 'center',
     justifyContent: 'center',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-      },
-      android: { elevation: 2 },
-    }),
+    ...shadowCardLight,
   },
   balanceCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CARD_BG,
     borderRadius: 24,
     padding: 18,
     marginBottom: 28,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.07,
-        shadowRadius: 12,
-      },
-      android: { elevation: 3 },
-    }),
+    ...shadowCard,
   },
   balanceRow: {
     flexDirection: 'row',
@@ -417,7 +425,7 @@ const styles = StyleSheet.create({
   balanceLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     letterSpacing: 0.8,
     marginBottom: 4,
   },
@@ -427,20 +435,20 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   balanceNegative: {
-    color: '#B03A2E',
+    color: RED,
   },
   balancePositive: {
-    color: '#2E7D32',
+    color: GREEN,
   },
   balanceHint: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     marginBottom: 12,
   },
   progressTrack: {
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#ECEFF1',
+    backgroundColor: LAVENDER_SOFT,
     overflow: 'hidden',
   },
   progressFill: {
@@ -450,13 +458,28 @@ const styles = StyleSheet.create({
   sectionHeading: {
     fontSize: 17,
     fontWeight: '700',
-    color: '#2D3436',
+    color: TEXT,
     marginBottom: 14,
+  },
+  quickActionsCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 22,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
+    marginBottom: 28,
+    ...shadowCardLight,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  quickActionsTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: TEXT,
+    marginBottom: 16,
   },
   quickActionsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 28,
   },
   quickActionCell: {
     flex: 1,
@@ -472,35 +495,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 10,
   },
-  quickScan: {
-    backgroundColor: '#EDE7F6',
-  },
-  quickExpense: {
-    backgroundColor: '#FFF3E0',
-  },
-  quickSale: {
-    backgroundColor: '#E0F7FA',
-  },
-  orangeCircle: {
+  expenseGoldCircle: {
     width: 52,
     height: 52,
     borderRadius: 26,
-    backgroundColor: '#FF9800',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tealCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#26A69A',
     alignItems: 'center',
     justifyContent: 'center',
   },
   quickActionLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#2D3436',
+    color: TEXT,
     textAlign: 'center',
   },
   activityHeaderRow: {
@@ -512,36 +517,30 @@ const styles = StyleSheet.create({
   viewAll: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#7C6FDB',
+    color: PRIMARY,
   },
   emptyCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CARD_BG,
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
   },
   emptyText: {
     fontSize: 14,
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     textAlign: 'center',
     lineHeight: 20,
   },
   activityCard: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: CARD_BG,
     borderRadius: 20,
     padding: 16,
     marginBottom: 10,
     alignItems: 'flex-start',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-      },
-      android: { elevation: 2 },
-    }),
+    ...shadowCardLight,
   },
   activityLeft: {
     flex: 1,
@@ -555,7 +554,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: '600',
-    color: '#2D3436',
+    color: TEXT,
   },
   verifiedCheck: {
     marginLeft: 6,
@@ -563,12 +562,12 @@ const styles = StyleSheet.create({
   },
   activitySubtitle: {
     fontSize: 13,
-    color: '#636E72',
+    color: TEXT_MUTED,
     marginTop: 4,
   },
   activityDate: {
     fontSize: 12,
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     marginTop: 6,
   },
   activityRight: {
@@ -579,14 +578,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   amountExpense: {
-    color: '#2D3436',
+    color: TEXT,
   },
   amountSale: {
-    color: '#2E7D32',
+    color: GREEN,
   },
   activityCategory: {
     fontSize: 11,
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     marginTop: 4,
   },
 });

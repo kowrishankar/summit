@@ -21,12 +21,17 @@ import {
 import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import { formatAmount } from '../utils/currency';
+import {
+  CARD_BG,
+  LAVENDER_SOFT,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY as PURPLE,
+  TEXT as TEXT_DARK,
+  TEXT_MUTED as LABEL_GREY,
+} from '../theme/design';
 
-const PURPLE = '#6366f1';
-const CARD_BG = '#F2F2F7';
-const LABEL_GREY = '#64748b';
-const TEXT_DARK = '#0f172a';
-const TRACK_BG = '#EDE9F5';
+const TRACK_BG = LAVENDER_SOFT;
 
 const MAX_CHART_BAR_HEIGHT = 112;
 
@@ -298,7 +303,7 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: PAGE_BG,
   },
   header: {
     flexDirection: 'row',
@@ -329,7 +334,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: CARD_BG,
+    backgroundColor: MUTED_CARD,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -363,7 +368,7 @@ const styles = StyleSheet.create({
   },
   chartCard: {
     marginTop: 12,
-    backgroundColor: CARD_BG,
+    backgroundColor: MUTED_CARD,
     borderRadius: 16,
     paddingVertical: 20,
     paddingHorizontal: 12,
@@ -464,7 +469,7 @@ const styles = StyleSheet.create({
   },
   incomeCard: {
     flex: 1,
-    backgroundColor: CARD_BG,
+    backgroundColor: MUTED_CARD,
     borderRadius: 14,
     paddingVertical: 16,
     paddingHorizontal: 14,
@@ -500,7 +505,7 @@ const styles = StyleSheet.create({
   },
   quickCard: {
     flex: 1,
-    backgroundColor: CARD_BG,
+    backgroundColor: MUTED_CARD,
     borderRadius: 14,
     paddingVertical: 18,
     paddingHorizontal: 14,

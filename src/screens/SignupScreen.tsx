@@ -8,16 +8,28 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  Switch,
+  ScrollView,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
-import { STRIPE_TRIAL_DAYS } from '../config/trial';
+import {
+  BORDER,
+  CARD_BG,
+  PAGE_BG,
+  PRIMARY,
+  PURPLE_DEEP,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+} from '../theme/design';
 
 const TRIAL_PREF_KEY = 'summit_subscribe_with_trial';
 
 export default function SignupScreen({ navigation }: { navigation: { navigate: (s: string) => void } }) {
+  const insets = useSafeAreaInsets();
   const { signup } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -59,145 +71,147 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.outer}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <AppText style={styles.title}>Create account</AppText>
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        value={email}
-        onChangeText={setEmail}
-        autoCapitalize="none"
-        keyboardType="email-address"
-        autoComplete="email"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Password (min 6 characters)"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoComplete="new-password"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm password"
-        value={confirm}
-        onChangeText={setConfirm}
-        secureTextEntry
-        autoComplete="new-password"
-      />
-      <AppText style={styles.paymentHint}>
-        
-      </AppText>
-      <AppText style={styles.sectionLabel}>Business details</AppText>
-      <TextInput
-        style={styles.input}
-        placeholder="Business name *"
-        value={businessName}
-        onChangeText={setBusinessName}
-        placeholderTextColor="#64748b"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Business address"
-        value={businessAddress}
-        onChangeText={setBusinessAddress}
-        placeholderTextColor="#64748b"
-      />
-      <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <AppText style={styles.buttonText}>Sign Up</AppText>}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <AppText style={styles.link}>Already have an account? Sign in</AppText>
-      </TouchableOpacity>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <AppText style={styles.title}>Create account</AppText>
+        <AppText style={styles.subtitle}>Start tracking invoices and sales</AppText>
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          value={email}
+          onChangeText={setEmail}
+          autoCapitalize="none"
+          keyboardType="email-address"
+          autoComplete="email"
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Password (min 6 characters)"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm password"
+          value={confirm}
+          onChangeText={setConfirm}
+          secureTextEntry
+          autoComplete="new-password"
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <AppText style={styles.sectionLabel}>Business details</AppText>
+        <TextInput
+          style={styles.input}
+          placeholder="Business name *"
+          value={businessName}
+          onChangeText={setBusinessName}
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Business address"
+          value={businessAddress}
+          onChangeText={setBusinessAddress}
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={handleSignup}
+          disabled={loading}
+          style={styles.gradientWrap}
+        >
+          <LinearGradient
+            colors={[PRIMARY, PURPLE_DEEP]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.button}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <AppText style={styles.buttonText}>Sign Up</AppText>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <AppText style={styles.link}>Already have an account? Sign in</AppText>
+        </TouchableOpacity>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  outer: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#ffffff',
+    backgroundColor: PAGE_BG,
+  },
+  container: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
   },
   title: {
     fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
+    fontWeight: '800',
+    color: TEXT,
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#94a3b8',
-    marginBottom: 32,
+    fontWeight: '500',
+    color: TEXT_SECONDARY,
+    marginBottom: 24,
   },
   sectionLabel: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#94a3b8',
-    marginBottom: 8,
+    fontWeight: '700',
+    color: TEXT,
+    marginBottom: 10,
     marginTop: 8,
-  },
-  paymentHint: {
-    fontSize: 13,
-    color: '#64748b',
-    marginBottom: 12,
-  },
-  trialRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  trialTextCol: {
-    flex: 1,
-  },
-  trialTitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0f172a',
-    marginBottom: 4,
-  },
-  trialHint: {
-    fontSize: 12,
-    color: '#64748b',
-    lineHeight: 17,
-  },
-  trialSwitch: {
-    marginLeft: 8,
   },
   input: {
-    backgroundColor: 'beige',
-    borderRadius: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
     padding: 16,
-    color: 'black',
-    marginBottom: 16,
+    color: TEXT,
+    marginBottom: 14,
     fontSize: 16,
   },
-  button: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
+  gradientWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
     marginTop: 8,
     marginBottom: 24,
+  },
+  button: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonText: {
     color: '#fff',
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   link: {
-    color: '#818cf8',
-    fontSize: 14,
+    color: PRIMARY,
+    fontSize: 15,
+    fontWeight: '600',
     textAlign: 'center',
     marginTop: 8,
   },

@@ -11,6 +11,15 @@ import {
 import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import {
+  BORDER,
+  PAGE_BG,
+  PRIMARY,
+  PURPLE_DEEP,
+  TEXT,
+  TEXT_SECONDARY,
+} from '../theme/design';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -62,7 +71,7 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
         {SLIDES.map((slide, i) => (
           <View key={i} style={[styles.slide, { width: SCREEN_WIDTH }]}>
             <View style={styles.iconWrap}>
-              <Ionicons name={slide.icon} size={64} color="#818cf8" />
+              <Ionicons name={slide.icon} size={64} color={PRIMARY} />
             </View>
             <AppText style={styles.title}>{slide.title}</AppText>
             <AppText style={styles.description}>{slide.description}</AppText>
@@ -82,8 +91,15 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
       <View style={styles.footer}>
         {isLast ? (
           <>
-            <TouchableOpacity style={styles.primaryButton} onPress={onSignUp} activeOpacity={0.8}>
-              <AppText style={styles.primaryButtonText}>Sign up</AppText>
+            <TouchableOpacity onPress={onSignUp} activeOpacity={0.92} style={styles.gradientWrap}>
+              <LinearGradient
+                colors={[PRIMARY, PURPLE_DEEP]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.primaryButton}
+              >
+                <AppText style={styles.primaryButtonText}>Sign up</AppText>
+              </LinearGradient>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={onLogIn} activeOpacity={0.8}>
               <AppText style={styles.secondaryButtonText}>Already have an account? Log in</AppText>
@@ -91,12 +107,19 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
           </>
         ) : (
           <TouchableOpacity
-            style={styles.nextButton}
             onPress={() => scrollRef.current?.scrollTo({ x: SCREEN_WIDTH * (index + 1), animated: true })}
-            activeOpacity={0.8}
+            activeOpacity={0.92}
+            style={styles.gradientWrap}
           >
-            <AppText style={styles.nextButtonText}>Next</AppText>
-            <Ionicons name="arrow-forward" size={20} color="#0f172a" />
+            <LinearGradient
+              colors={[PRIMARY, PURPLE_DEEP]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.nextButton}
+            >
+              <AppText style={styles.nextButtonText}>Next</AppText>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
+            </LinearGradient>
           </TouchableOpacity>
         )}
       </View>
@@ -107,7 +130,12 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: PAGE_BG,
+  },
+  gradientWrap: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 12,
   },
   slide: {
     flex: 1,
@@ -119,7 +147,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: 'rgba(129, 140, 248, 0.2)',
+    backgroundColor: 'rgba(123, 97, 255, 0.18)',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 32,
@@ -127,13 +155,13 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#0f172a',
+    color: TEXT,
     textAlign: 'center',
     marginBottom: 12,
   },
   description: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -147,10 +175,10 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#334155',
+    backgroundColor: BORDER,
   },
   dotActive: {
-    backgroundColor: '#818cf8',
+    backgroundColor: PRIMARY,
     width: 24,
   },
   footer: {
@@ -158,11 +186,9 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
   primaryButton: {
-    backgroundColor: '#818cf8',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
-    marginBottom: 12,
   },
   primaryButtonText: {
     fontSize: 17,
@@ -175,16 +201,16 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: {
     fontSize: 15,
-    color: '#94a3b8',
+    fontWeight: '600',
+    color: PRIMARY,
   },
   nextButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    backgroundColor: '#818cf8',
     paddingVertical: 16,
-    borderRadius: 12,
+    borderRadius: 14,
   },
   nextButtonText: {
     fontSize: 17,

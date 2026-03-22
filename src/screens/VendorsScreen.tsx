@@ -3,6 +3,15 @@ import { View, StyleSheet, FlatList } from 'react-native';
 import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import { formatAmount } from '../utils/currency';
+import {
+  BORDER,
+  CARD_BG,
+  PAGE_BG,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+  shadowCardLight,
+} from '../theme/design';
 
 export default function VendorsScreen() {
   const { invoices } = useApp();
@@ -43,15 +52,18 @@ export default function VendorsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: PAGE_BG },
   list: { padding: 16 },
   row: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
-  name: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
-  meta: { fontSize: 13, color: '#94a3b8', marginTop: 4 },
-  empty: { color: '#64748b', textAlign: 'center', marginTop: 40 },
+  name: { fontSize: 16, fontWeight: '600', color: TEXT },
+  meta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4 },
+  empty: { color: TEXT_MUTED, textAlign: 'center', marginTop: 40 },
 });

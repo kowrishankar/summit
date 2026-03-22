@@ -24,6 +24,17 @@ import {
   createTrialSubscription,
 } from '../services/stripeApi';
 import { createSubscriptionFromStripe, hasActiveAccess } from '../services/subscription';
+import {
+  BORDER,
+  CARD_BG,
+  LAVENDER_SOFT,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+} from '../theme/design';
 
 const TRIAL_PREF_KEY = 'summit_subscribe_with_trial';
 
@@ -247,7 +258,7 @@ function SubscribeScreenWithStripe() {
         <AppText style={styles.benefitsTitle}>What you get</AppText>
         {benefits.map((item, index) => (
           <View key={index} style={styles.benefitRow}>
-            <Ionicons name={item.icon} size={22} color="#6366f1" style={styles.benefitIcon} />
+            <Ionicons name={item.icon} size={22} color={PRIMARY} style={styles.benefitIcon} />
             <AppText style={styles.benefitText}>{item.text}</AppText>
           </View>
         ))}
@@ -272,8 +283,8 @@ function SubscribeScreenWithStripe() {
             style={styles.trialSwitch}
             value={startWithTrial}
             onValueChange={persistTrialChoice}
-            trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
-            thumbColor={startWithTrial ? '#6366f1' : '#f4f4f5'}
+            trackColor={{ false: '#cbd5e1', true: LAVENDER_SOFT }}
+            thumbColor={startWithTrial ? PRIMARY : '#f4f4f5'}
             disabled={loading}
           />
         </View>
@@ -315,7 +326,7 @@ function SubscribeScreenWithStripe() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: PAGE_BG,
   },
   scrollContent: {
     flexGrow: 1,
@@ -326,28 +337,30 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 26,
     fontWeight: '700',
-    color: '#0f172a',
+    color: TEXT,
     marginBottom: 6,
     textAlign: 'center',
   },
   tagline: {
     fontSize: 15,
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     marginBottom: 24,
     textAlign: 'center',
     lineHeight: 22,
   },
   benefitsCard: {
     width: '100%',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 16,
+    backgroundColor: MUTED_CARD,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
     padding: 20,
     marginBottom: 24,
   },
   benefitsTitle: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#334155',
+    fontWeight: '700',
+    color: TEXT,
     marginBottom: 16,
   },
   benefitRow: {
@@ -362,7 +375,7 @@ const styles = StyleSheet.create({
   benefitText: {
     flex: 1,
     fontSize: 14,
-    color: 'black',
+    color: TEXT,
     lineHeight: 20,
   },
   priceBlock: {
@@ -373,16 +386,16 @@ const styles = StyleSheet.create({
   price: {
     fontSize: 28,
     fontWeight: '700',
-    color: '#0f172a',
+    color: TEXT,
   },
   pricePeriod: {
     fontSize: 16,
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     marginLeft: 6,
   },
   cancelNote: {
     fontSize: 13,
-    color: '#64748b',
+    color: TEXT_MUTED,
     marginBottom: 12,
     textAlign: 'center',
   },
@@ -393,10 +406,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: '#f8fafc',
-    borderRadius: 12,
+    backgroundColor: MUTED_CARD,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: BORDER,
   },
   trialTextCol: {
     flex: 1,
@@ -404,12 +417,12 @@ const styles = StyleSheet.create({
   trialTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#0f172a',
+    color: TEXT,
     marginBottom: 4,
   },
   trialHint: {
     fontSize: 12,
-    color: '#64748b',
+    color: TEXT_MUTED,
     lineHeight: 17,
   },
   trialSwitch: {
@@ -417,7 +430,7 @@ const styles = StyleSheet.create({
   },
   twoStepNote: {
     fontSize: 12,
-    color: '#64748b',
+    color: TEXT_MUTED,
     marginBottom: 20,
     textAlign: 'center',
     paddingHorizontal: 8,
@@ -425,13 +438,13 @@ const styles = StyleSheet.create({
   },
   webNote: {
     fontSize: 14,
-    color: '#64748b',
+    color: TEXT_MUTED,
     textAlign: 'center',
     paddingHorizontal: 24,
   },
   button: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    borderRadius: 16,
     paddingVertical: 16,
     paddingHorizontal: 24,
     minWidth: 260,
@@ -448,14 +461,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     minWidth: 260,
     alignItems: 'center',
-    borderRadius: 12,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#cbd5e1',
-    backgroundColor: '#ffffff',
+    borderColor: BORDER,
+    backgroundColor: CARD_BG,
   },
   logoutButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#64748b',
+    color: TEXT_MUTED,
   },
 });

@@ -25,21 +25,31 @@ import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import EditInvoiceScreen from '../screens/EditInvoiceScreen';
 import BusinessSwitchScreen from '../screens/BusinessSwitchScreen';
 import DashboardScreen from '../screens/DashboardScreen';
+import {
+  BORDER,
+  CARD_BG,
+  PAGE_BG,
+  PRIMARY,
+  PURPLE,
+  TEXT,
+  headerScreenOptions,
+} from '../theme/design';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 const tabScreenOptions = {
-  headerStyle: { backgroundColor: '#ffffff' },
-  headerTintColor: '#0f172a',
-  tabBarStyle: { backgroundColor: '#ffffff', borderTopColor: '#e2e8f0' },
-  tabBarActiveTintColor: '#6366f1',
+  headerStyle: { backgroundColor: PAGE_BG },
+  headerTintColor: TEXT,
+  headerShadowVisible: false,
+  tabBarStyle: { backgroundColor: CARD_BG, borderTopColor: BORDER },
+  tabBarActiveTintColor: PRIMARY,
   tabBarInactiveTintColor: '#64748b',
 };
 
 function HomeStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}>
+    <Stack.Navigator screenOptions={headerScreenOptions}>
       <Stack.Screen name="HomeMain" component={HomeScreen} options={{ title: 'Home' }} />
       <Stack.Screen
         name="Dashboard"
@@ -53,10 +63,7 @@ function HomeStack() {
 
 function RecordsStack() {
   return (
-    <Stack.Navigator
-      screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}
-      initialRouteName="InvoicesList"
-    >
+    <Stack.Navigator screenOptions={headerScreenOptions} initialRouteName="InvoicesList">
       <Stack.Screen name="InvoicesList" component={InvoicesScreen} options={{ title: 'Invoices' }} />
       <Stack.Screen name="SalesList" component={SalesScreen} options={{ title: 'Sales' }} />
       <Stack.Screen
@@ -72,7 +79,7 @@ function RecordsStack() {
                 onPress={() => navigation.navigate('EditInvoice', { invoiceId: params.invoiceId })}
                 style={{ marginRight: 16 }}
               >
-                <AppText style={{ color: '#6366f1', fontWeight: '600', fontSize: 16 }}>Edit</AppText>
+                <AppText style={{ color: PRIMARY, fontWeight: '600', fontSize: 16 }}>Edit</AppText>
               </TouchableOpacity>
             );
           },
@@ -86,10 +93,7 @@ function RecordsStack() {
 
 function AddStack() {
   return (
-    <Stack.Navigator
-      initialRouteName="AddInvoiceRoot"
-      screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}
-    >
+    <Stack.Navigator initialRouteName="AddInvoiceRoot" screenOptions={headerScreenOptions}>
       <Stack.Screen name="AddInvoiceRoot" component={AddInvoiceScreen} options={{ title: 'Add invoice' }} />
       <Stack.Screen name="AddSaleRoot" component={AddSaleScreen} options={{ title: 'Add sale' }} />
     </Stack.Navigator>
@@ -121,7 +125,7 @@ function RecordsTabBarPopup({
               onClose();
             }}
           >
-            <Ionicons name="document-text-outline" size={20} color="#818cf8" />
+            <Ionicons name="document-text-outline" size={20} color={PURPLE} />
             <AppText style={popupStyles.optionText}>Invoices</AppText>
           </Pressable>
           <Pressable
@@ -164,7 +168,7 @@ function AddTabBarPopup({
               onClose();
             }}
           >
-            <Ionicons name="document-text-outline" size={20} color="#818cf8" />
+            <Ionicons name="document-text-outline" size={20} color={PURPLE} />
             <AppText style={popupStyles.optionText}>Add invoice</AppText>
           </Pressable>
           <Pressable
@@ -191,15 +195,15 @@ const popupStyles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.4)',
   },
   popup: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    backgroundColor: CARD_BG,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     paddingVertical: 8,
     paddingHorizontal: 8,
     marginHorizontal: 12,
     marginBottom: 70,
     borderWidth: 1,
-    borderColor: '#e2e8f0',
+    borderColor: BORDER,
   },
   option: {
     flexDirection: 'row',
@@ -216,7 +220,7 @@ const popupStyles = StyleSheet.create({
   optionText: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#0f172a',
+    color: TEXT,
   },
 });
 
@@ -271,7 +275,7 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
                     : name === 'Settings'
                       ? 'settings'
                       : 'ellipse';
-          const color = isFocused ? '#818cf8' : '#64748b';
+          const color = isFocused ? PURPLE : '#64748b';
 
           return (
             <Pressable
@@ -320,8 +324,8 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
 const tabBarStyles = StyleSheet.create({
   tabBarContainer: {
     flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderTopColor: '#e2e8f0',
+    backgroundColor: CARD_BG,
+    borderTopColor: BORDER,
     borderTopWidth: 1,
     paddingBottom: 24,
     paddingTop: 8,
@@ -336,7 +340,7 @@ const tabBarStyles = StyleSheet.create({
     overflow: 'hidden',
   },
   tabPressed: {
-    backgroundColor: 'rgba(99, 102, 241, 0.12)',
+    backgroundColor: 'rgba(123, 97, 255, 0.12)',
   },
   label: {
     fontSize: 11,
@@ -383,6 +387,7 @@ export default function MainTabs() {
         name="Settings"
         component={SettingsScreen}
         options={{
+          headerShown: false,
           tabBarLabel: 'Settings',
           tabBarIcon: ({ color, size }) => <Ionicons name="settings" size={size} color={color} />,
         }}

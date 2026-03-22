@@ -11,6 +11,18 @@ import {
 import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import type { Category } from '../types';
+import {
+  BORDER,
+  CARD_BG,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  RED,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+  shadowCardLight,
+} from '../theme/design';
 
 export default function CategoriesScreen() {
   const { categories, addCategory, updateCategory, deleteCategory } = useApp();
@@ -64,7 +76,7 @@ export default function CategoriesScreen() {
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <View style={[styles.colorDot, { backgroundColor: item.color ?? '#6366f1' }]} />
+            <View style={[styles.colorDot, { backgroundColor: item.color ?? PRIMARY }]} />
             <AppText style={styles.name}>{item.name}</AppText>
             <View style={styles.actions}>
               <TouchableOpacity onPress={() => handleEdit(item)}>
@@ -91,7 +103,7 @@ export default function CategoriesScreen() {
               placeholder="Category name"
               value={name}
               onChangeText={setName}
-              placeholderTextColor="#64748b"
+              placeholderTextColor={TEXT_MUTED}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setModalVisible(false)}>
@@ -114,7 +126,7 @@ export default function CategoriesScreen() {
               placeholder="Category name"
               value={editName}
               onChangeText={setEditName}
-              placeholderTextColor="#64748b"
+              placeholderTextColor={TEXT_MUTED}
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setEditModalVisible(false)}>
@@ -132,52 +144,57 @@ export default function CategoriesScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: PAGE_BG },
   list: { padding: 16, paddingBottom: 80 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
   colorDot: { width: 12, height: 12, borderRadius: 6, marginRight: 12 },
-  name: { flex: 1, fontSize: 16, color: '#0f172a' },
+  name: { flex: 1, fontSize: 16, fontWeight: '600', color: TEXT },
   actions: { flexDirection: 'row', gap: 16 },
-  actionText: { color: '#818cf8', fontSize: 14 },
-  deleteText: { color: '#ef4444' },
-  empty: { color: '#64748b', textAlign: 'center', marginTop: 40 },
+  actionText: { color: PRIMARY, fontSize: 14, fontWeight: '600' },
+  deleteText: { color: RED },
+  empty: { color: TEXT_MUTED, textAlign: 'center', marginTop: 40 },
   fab: {
     position: 'absolute',
     bottom: 24,
     left: 20,
     right: 20,
-    backgroundColor: '#6366f1',
+    backgroundColor: PRIMARY,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
   },
-  fabText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(15,23,42,0.45)',
     justifyContent: 'center',
     padding: 24,
   },
-  modal: { backgroundColor: '#f1f5f9', borderRadius: 16, padding: 24 },
-  modalTitle: { fontSize: 18, fontWeight: '600', color: '#0f172a', marginBottom: 16 },
+  modal: { backgroundColor: CARD_BG, borderRadius: 20, padding: 24, borderWidth: 1, borderColor: BORDER },
+  modalTitle: { fontSize: 18, fontWeight: '700', color: TEXT, marginBottom: 16 },
   input: {
-    backgroundColor: '#ffffff',
-    borderRadius: 12,
+    backgroundColor: MUTED_CARD,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
     padding: 14,
-    color: '#0f172a',
+    color: TEXT,
     fontSize: 16,
     marginBottom: 20,
   },
   modalButtons: { flexDirection: 'row', justifyContent: 'flex-end', gap: 12 },
   modalBtn: { paddingVertical: 10, paddingHorizontal: 16 },
-  modalBtnText: { color: '#94a3b8' },
-  modalBtnPrimary: { backgroundColor: '#6366f1', borderRadius: 8 },
-  modalBtnTextPrimary: { color: '#fff', fontWeight: '600' },
+  modalBtnText: { color: TEXT_SECONDARY, fontWeight: '600' },
+  modalBtnPrimary: { backgroundColor: PRIMARY, borderRadius: 12 },
+  modalBtnTextPrimary: { color: '#fff', fontWeight: '700' },
 });

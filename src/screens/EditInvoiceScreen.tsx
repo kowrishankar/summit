@@ -11,6 +11,15 @@ import {
 import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import type { ExtractedInvoiceData } from '../types';
+import {
+  BORDER,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+} from '../theme/design';
 
 export default function EditInvoiceScreen({
   route = {},
@@ -105,7 +114,7 @@ export default function EditInvoiceScreen({
         placeholder="YYYY-MM-DD"
         value={date}
         onChangeText={setDate}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Merchant name</AppText>
@@ -114,7 +123,7 @@ export default function EditInvoiceScreen({
         placeholder="Merchant or vendor name"
         value={merchantName}
         onChangeText={setMerchantName}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Supplier name (optional)</AppText>
@@ -123,7 +132,7 @@ export default function EditInvoiceScreen({
         placeholder="Supplier name if different"
         value={supplierName}
         onChangeText={setSupplierName}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Document reference (optional)</AppText>
@@ -132,7 +141,7 @@ export default function EditInvoiceScreen({
         placeholder="Invoice number / reference"
         value={documentReference}
         onChangeText={setDocumentReference}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Amount</AppText>
@@ -142,7 +151,7 @@ export default function EditInvoiceScreen({
         value={amount}
         onChangeText={setAmount}
         keyboardType="decimal-pad"
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Currency</AppText>
@@ -151,7 +160,7 @@ export default function EditInvoiceScreen({
         placeholder="USD, EUR, GBP..."
         value={currency}
         onChangeText={setCurrency}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
         autoCapitalize="characters"
       />
 
@@ -162,7 +171,7 @@ export default function EditInvoiceScreen({
         value={vatAmount}
         onChangeText={setVatAmount}
         keyboardType="decimal-pad"
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Merchant address (optional)</AppText>
@@ -171,7 +180,7 @@ export default function EditInvoiceScreen({
         placeholder="Address"
         value={merchantAddress}
         onChangeText={setMerchantAddress}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Merchant phone (optional)</AppText>
@@ -180,7 +189,7 @@ export default function EditInvoiceScreen({
         placeholder="Phone"
         value={merchantPhone}
         onChangeText={setMerchantPhone}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
         keyboardType="phone-pad"
       />
 
@@ -190,7 +199,7 @@ export default function EditInvoiceScreen({
         placeholder="Email"
         value={merchantEmail}
         onChangeText={setMerchantEmail}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
         keyboardType="email-address"
       />
 
@@ -200,7 +209,7 @@ export default function EditInvoiceScreen({
         placeholder="e.g. Card, Bank transfer, Cash"
         value={paymentType}
         onChangeText={setPaymentType}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Owned by / Customer (optional)</AppText>
@@ -209,7 +218,7 @@ export default function EditInvoiceScreen({
         placeholder="Customer or billed to"
         value={ownedBy}
         onChangeText={setOwnedBy}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
 
       <AppText style={labelStyle}>Category</AppText>
@@ -243,15 +252,17 @@ export default function EditInvoiceScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: PAGE_BG },
   content: { padding: 20, paddingBottom: 40 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#334155', marginBottom: 16 },
-  label: { fontSize: 14, color: '#94a3b8', marginBottom: 6 },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: TEXT, marginBottom: 16 },
+  label: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 6 },
   input: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: MUTED_CARD,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
     padding: 14,
-    color: '#0f172a',
+    color: TEXT,
     fontSize: 16,
     marginBottom: 16,
   },
@@ -260,17 +271,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
-  chipActive: { backgroundColor: '#6366f1' },
-  chipText: { color: '#94a3b8', fontSize: 14 },
+  chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipText: { color: TEXT_SECONDARY, fontSize: 14 },
   chipTextActive: { color: '#fff', fontWeight: '600' },
   saveBtn: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
+    backgroundColor: PRIMARY,
+    borderRadius: 16,
     padding: 16,
     alignItems: 'center',
   },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  empty: { color: '#94a3b8', textAlign: 'center', marginTop: 40 },
+  empty: { color: TEXT_SECONDARY, textAlign: 'center', marginTop: 40 },
 });

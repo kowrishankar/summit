@@ -21,6 +21,17 @@ import ImageView from 'react-native-image-viewing';
 import { useApp } from '../contexts/AppContext';
 import { formatAmount } from '../utils/currency';
 import { format } from 'date-fns';
+import {
+  BORDER,
+  CARD_BG,
+  GREEN,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+} from '../theme/design';
 
 const HANDLE_HEIGHT = 88;       // collapsed: drag handle strip
 const HEADER_RESERVED = 56;     // space for nav bar "Invoice" so sheet stays below it
@@ -278,7 +289,7 @@ export default function InvoiceDetailScreen({
           visible={imageViewerVisible}
           onRequestClose={() => setImageViewerVisible(false)}
           doubleTapToZoomEnabled
-          backgroundColor="#ffffff"
+          backgroundColor={CARD_BG}
           FooterComponent={({ imageIndex }) => (
             <TouchableOpacity
               style={styles.fullscreenCloseButton}
@@ -327,28 +338,28 @@ export default function InvoiceDetailScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  empty: { color: '#94a3b8', textAlign: 'center', marginTop: 40 },
+  container: { flex: 1, backgroundColor: PAGE_BG },
+  empty: { color: TEXT_SECONDARY, textAlign: 'center', marginTop: 40 },
   docContainer: {
     width: '100%',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   imageTouchable: { flex: 1, width: '100%' },
   docScroll: { flex: 1, width: '100%' },
   docScrollContent: { paddingBottom: 16 },
   docSectionWrap: {
     marginBottom: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
     borderRadius: 8,
     overflow: 'hidden',
   },
   docSectionLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   docSectionImage: { width: '100%', height: 280 },
   docImage: { width: '100%', height: '100%' },
@@ -372,23 +383,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 24,
   },
-  fullscreenCloseText: { fontSize: 16, color: '#0f172a', fontWeight: '600' },
+  fullscreenCloseText: { fontSize: 16, color: TEXT, fontWeight: '600' },
   pdfPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  pdfPlaceholderText: { fontSize: 18, color: '#64748b' },
-  pdfFileName: { fontSize: 13, color: '#475569', marginTop: 4 },
+  pdfPlaceholderText: { fontSize: 18, color: TEXT_MUTED },
+  pdfFileName: { fontSize: 13, color: TEXT_MUTED, marginTop: 4 },
   pdfWebViewContainer: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   pdfWebView: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   expandPdfButton: {
     position: 'absolute',
@@ -404,12 +415,12 @@ const styles = StyleSheet.create({
   },
   pdfFullScreenContainer: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: CARD_BG,
   },
   pdfFullScreenWebView: {
     flex: 1,
     width: '100%',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   pdfExitButton: {
     position: 'absolute',
@@ -422,7 +433,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 12,
   },
-  pdfExitButtonText: { fontSize: 16, color: '#0f172a', fontWeight: '600' },
+  pdfExitButtonText: { fontSize: 16, color: TEXT, fontWeight: '600' },
   viewPdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -430,22 +441,22 @@ const styles = StyleSheet.create({
     marginTop: 16,
     paddingVertical: 12,
     paddingHorizontal: 20,
-    backgroundColor: '#3b82f6',
+    backgroundColor: PRIMARY,
     borderRadius: 10,
   },
-  viewPdfButtonText: { fontSize: 16, color: '#0f172a', fontWeight: '600' },
+  viewPdfButtonText: { fontSize: 16, color: '#fff', fontWeight: '600' },
   noDocPlaceholder: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  noDocText: { fontSize: 14, color: '#64748b' },
+  noDocText: { fontSize: 14, color: TEXT_MUTED },
   panel: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#ffffff',
+    backgroundColor: CARD_BG,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     overflow: 'hidden',
@@ -461,46 +472,46 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: CARD_BG,
   },
   handle: {
     width: 40,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#cbd5e1',
+    backgroundColor: BORDER,
   },
-  panelScroll: { flex: 1, backgroundColor: '#ffffff' },
-  panelContent: { padding: 20, paddingTop: 4, paddingBottom: 48, backgroundColor: '#ffffff' },
+  panelScroll: { flex: 1, backgroundColor: CARD_BG },
+  panelContent: { padding: 20, paddingTop: 4, paddingBottom: 48, backgroundColor: CARD_BG },
   panelTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#0f172a',
+    color: TEXT,
     marginBottom: 16,
   },
   header: { marginBottom: 16 },
-  merchant: { fontSize: 20, fontWeight: '700', color: '#0f172a' },
-  amount: { fontSize: 22, fontWeight: '700', color: '#16a34a', marginTop: 4 },
+  merchant: { fontSize: 20, fontWeight: '700', color: TEXT },
+  amount: { fontSize: 22, fontWeight: '700', color: GREEN, marginTop: 4 },
   meta: { marginBottom: 16 },
-  metaText: { fontSize: 14, color: '#64748b' },
+  metaText: { fontSize: 14, color: TEXT_MUTED },
   detailsGrid: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
     borderRadius: 12,
     padding: 14,
     marginBottom: 20,
   },
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  detailLabel: { fontSize: 13, color: '#64748b' },
-  detailValue: { fontSize: 14, color: '#0f172a', fontWeight: '500' },
+  detailLabel: { fontSize: 13, color: TEXT_MUTED },
+  detailValue: { fontSize: 14, color: TEXT, fontWeight: '500' },
   section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 8 },
-  body: { fontSize: 14, color: '#334155' },
+  sectionTitle: { fontSize: 14, fontWeight: '600', color: TEXT_MUTED, marginBottom: 8 },
+  body: { fontSize: 14, color: TEXT },
   lineRow: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
     borderRadius: 8,
     padding: 12,
     marginBottom: 8,
   },
-  lineDesc: { color: '#0f172a' },
-  lineQty: { fontSize: 12, color: '#64748b', marginTop: 4 },
-  linePrice: { fontSize: 14, color: '#16a34a', marginTop: 4 },
+  lineDesc: { color: TEXT },
+  lineQty: { fontSize: 12, color: TEXT_MUTED, marginTop: 4 },
+  linePrice: { fontSize: 14, color: GREEN, marginTop: 4 },
 });

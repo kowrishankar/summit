@@ -26,6 +26,17 @@ import { renderPdfFirstPageToImageBase64 } from '../services/pdfText';
 import { formatAmount } from '../utils/currency';
 import { maybeSaveCameraImageToGallery } from '../utils/saveCameraImageToGallery';
 import type { ExtractedInvoiceData } from '../types';
+import {
+  BORDER,
+  CARD_BG,
+  GREEN,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+} from '../theme/design';
 
 export default function AddInvoiceScreen({
   navigation,
@@ -452,7 +463,7 @@ export default function AddInvoiceScreen({
             visible={previewZoomVisible}
             onRequestClose={() => setPreviewZoomVisible(false)}
             doubleTapToZoomEnabled
-            backgroundColor="#ffffff"
+            backgroundColor={CARD_BG}
           />
         )}
       </ScrollView>
@@ -462,7 +473,7 @@ export default function AddInvoiceScreen({
   if (step === 'extracting') {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#6366f1" />
+        <ActivityIndicator size="large" color={PRIMARY} />
         <AppText style={styles.extractingText}>Analysing invoice…</AppText>
       </View>
     );
@@ -521,7 +532,7 @@ export default function AddInvoiceScreen({
           placeholder="Merchant name"
           value={extracted.merchantName ?? ''}
           onChangeText={(t) => updateField('merchantName', t || undefined)}
-          placeholderTextColor="#64748b"
+          placeholderTextColor={TEXT_MUTED}
         />
         <TextInput
           style={styles.input}
@@ -529,21 +540,21 @@ export default function AddInvoiceScreen({
           value={String(extracted.amount ?? '')}
           onChangeText={(t) => updateField('amount', parseFloat(t) || 0)}
           keyboardType="decimal-pad"
-          placeholderTextColor="#64748b"
+          placeholderTextColor={TEXT_MUTED}
         />
         <TextInput
           style={styles.input}
           placeholder="Currency (e.g. USD, EUR)"
           value={extracted.currency ?? ''}
           onChangeText={(t) => updateField('currency', t || undefined)}
-          placeholderTextColor="#64748b"
+          placeholderTextColor={TEXT_MUTED}
         />
         <TextInput
           style={styles.input}
           placeholder="Date (YYYY-MM-DD)"
           value={extracted.date ?? ''}
           onChangeText={(t) => updateField('date', t)}
-          placeholderTextColor="#64748b"
+          placeholderTextColor={TEXT_MUTED}
         />
         <AppText style={styles.label}>Category</AppText>
         <View style={styles.chipRow}>
@@ -578,57 +589,57 @@ export default function AddInvoiceScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: PAGE_BG },
   centered: { justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '700', color: '#0f172a', margin: 20 },
-  subtitle: { fontSize: 14, color: '#94a3b8', marginHorizontal: 20, marginBottom: 20 },
+  title: { fontSize: 22, fontWeight: '700', color: TEXT, margin: 20 },
+  subtitle: { fontSize: 14, color: TEXT_SECONDARY, marginHorizontal: 20, marginBottom: 20 },
   chooseScroll: { flex: 1 },
   chooseContent: { paddingBottom: 24 },
   option: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
     borderRadius: 12,
     padding: 20,
     marginHorizontal: 20,
     marginBottom: 12,
   },
-  optionText: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
-  optionSub: { fontSize: 13, color: '#94a3b8', marginTop: 4 },
+  optionText: { fontSize: 16, fontWeight: '600', color: TEXT },
+  optionSub: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4 },
   previewContent: { padding: 20, paddingBottom: 40 },
-  previewSubtitle: { fontSize: 14, color: '#94a3b8', marginBottom: 16 },
-  sectionCountLabel: { fontSize: 14, color: '#818cf8', fontWeight: '600', marginBottom: 12 },
+  previewSubtitle: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 16 },
+  sectionCountLabel: { fontSize: 14, color: PRIMARY, fontWeight: '600', marginBottom: 12 },
   previewSectionsContainer: { marginBottom: 16 },
   previewSectionWrap: {
     marginBottom: 16,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   previewSectionLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   previewSectionImage: { width: '100%', height: 260 },
-  previewZoomHintInline: { fontSize: 12, color: '#64748b', textAlign: 'center', marginBottom: 8 },
+  previewZoomHintInline: { fontSize: 12, color: TEXT_MUTED, textAlign: 'center', marginBottom: 8 },
   addSectionBtn: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
     borderRadius: 12,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: BORDER,
     borderStyle: 'dashed',
   },
-  addSectionBtnText: { fontSize: 16, fontWeight: '600', color: '#334155' },
-  addSectionBtnSub: { fontSize: 13, color: '#64748b', marginTop: 4 },
+  addSectionBtnText: { fontSize: 16, fontWeight: '600', color: TEXT },
+  addSectionBtnSub: { fontSize: 13, color: TEXT_MUTED, marginTop: 4 },
   previewBox: {
     marginBottom: 24,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
     minHeight: 220,
   },
   previewImageTouchable: { width: '100%' },
@@ -641,9 +652,9 @@ const styles = StyleSheet.create({
     padding: 10,
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  previewZoomHintText: { fontSize: 12, color: '#334155', textAlign: 'center' },
+  previewZoomHintText: { fontSize: 12, color: TEXT, textAlign: 'center' },
   previewActions: { gap: 12 },
-  confirmBtn: { backgroundColor: '#22c55e', borderRadius: 12, padding: 16, alignItems: 'center' },
+  confirmBtn: { backgroundColor: GREEN, borderRadius: 12, padding: 16, alignItems: 'center' },
   confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
   selectAnotherBtn: {
     backgroundColor: 'transparent',
@@ -651,63 +662,63 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: BORDER,
   },
-  selectAnotherBtnText: { color: '#94a3b8', fontSize: 16, fontWeight: '600' },
-  extractingText: { marginTop: 16, color: '#94a3b8' },
+  selectAnotherBtnText: { color: TEXT_SECONDARY, fontSize: 16, fontWeight: '600' },
+  extractingText: { marginTop: 16, color: TEXT_SECONDARY },
   reviewContent: { padding: 20, paddingBottom: 40 },
-  reviewSubtitle: { fontSize: 14, color: '#94a3b8', marginBottom: 16 },
-  docPreview: { marginBottom: 20, borderRadius: 12, overflow: 'hidden', backgroundColor: '#f1f5f9', minHeight: 200 },
+  reviewSubtitle: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 16 },
+  docPreview: { marginBottom: 20, borderRadius: 12, overflow: 'hidden', backgroundColor: MUTED_CARD, minHeight: 200 },
   docImage: { width: '100%', height: 280 },
-  docPreviewSmall: { marginBottom: 12, borderRadius: 8, overflow: 'hidden', backgroundColor: '#f1f5f9', alignSelf: 'center' },
+  docPreviewSmall: { marginBottom: 12, borderRadius: 8, overflow: 'hidden', backgroundColor: MUTED_CARD, alignSelf: 'center' },
   docImageSmall: { width: 200, height: 140 },
-  docLabel: { fontSize: 13, color: '#94a3b8', marginBottom: 12 },
+  docLabel: { fontSize: 13, color: TEXT_SECONDARY, marginBottom: 12 },
   pdfPreviewContainer: {
     width: '100%',
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
   pdfPreviewWebView: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
-  pdfFileNamePreview: { fontSize: 12, color: '#64748b', marginTop: 8, textAlign: 'center' },
+  pdfFileNamePreview: { fontSize: 12, color: TEXT_MUTED, marginTop: 8, textAlign: 'center' },
   pdfPlaceholder: { padding: 24, alignItems: 'center', justifyContent: 'center', minHeight: 120 },
-  pdfPlaceholderText: { color: '#94a3b8', fontSize: 14 },
-  pdfFileName: { color: '#64748b', fontSize: 12, marginTop: 4 },
-  reviewSummary: { marginBottom: 24, padding: 16, backgroundColor: '#f1f5f9', borderRadius: 12 },
-  reviewMerchant: { fontSize: 18, fontWeight: '600', color: '#0f172a' },
-  reviewAmount: { fontSize: 22, fontWeight: '700', color: '#22c55e', marginTop: 8 },
-  reviewMeta: { fontSize: 13, color: '#94a3b8', marginTop: 4 },
+  pdfPlaceholderText: { color: TEXT_SECONDARY, fontSize: 14 },
+  pdfFileName: { color: TEXT_MUTED, fontSize: 12, marginTop: 4 },
+  reviewSummary: { marginBottom: 24, padding: 16, backgroundColor: MUTED_CARD, borderRadius: 12 },
+  reviewMerchant: { fontSize: 18, fontWeight: '600', color: TEXT },
+  reviewAmount: { fontSize: 22, fontWeight: '700', color: GREEN, marginTop: 8 },
+  reviewMeta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4 },
   reviewActions: { gap: 12 },
-  acceptBtn: { backgroundColor: '#22c55e', borderRadius: 12, padding: 16, alignItems: 'center' },
+  acceptBtn: { backgroundColor: GREEN, borderRadius: 12, padding: 16, alignItems: 'center' },
   acceptBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  modifyBtn: { backgroundColor: '#f1f5f9', borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: '#334155' },
-  modifyBtnText: { color: '#334155', fontSize: 16, fontWeight: '600' },
+  modifyBtn: { backgroundColor: MUTED_CARD, borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: BORDER },
+  modifyBtnText: { color: TEXT, fontSize: 16, fontWeight: '600' },
   editContent: { padding: 20, paddingBottom: 40 },
   input: {
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
     borderRadius: 12,
     padding: 14,
-    color: '#0f172a',
+    color: TEXT,
     fontSize: 16,
     marginBottom: 12,
   },
-  label: { fontSize: 14, color: '#94a3b8', marginBottom: 8 },
+  label: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 8 },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
   chip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
   },
-  chipActive: { backgroundColor: '#6366f1' },
-  chipText: { color: '#94a3b8', fontSize: 14 },
+  chipActive: { backgroundColor: PRIMARY },
+  chipText: { color: TEXT_SECONDARY, fontSize: 14 },
   chipTextActive: { color: '#fff', fontWeight: '600' },
   saveBtn: {
-    backgroundColor: '#6366f1',
+    backgroundColor: PRIMARY,
     borderRadius: 12,
     padding: 16,
     alignItems: 'center',

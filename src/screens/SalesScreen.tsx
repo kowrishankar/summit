@@ -15,6 +15,19 @@ import { formatAmount } from '../utils/currency';
 import { format } from 'date-fns';
 import { groupByReceiptDate } from '../utils/groupByReceiptDate';
 import type { Sale } from '../types';
+import {
+  BORDER,
+  CARD_BG,
+  GREEN,
+  MUTED_CARD,
+  PAGE_BG,
+  PRIMARY,
+  RED,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+  shadowCardLight,
+} from '../theme/design';
 
 export default function SalesScreen({
   navigation,
@@ -79,7 +92,7 @@ export default function SalesScreen({
         placeholder="Search by merchant or category..."
         value={query}
         onChangeText={setQuery}
-        placeholderTextColor="#64748b"
+        placeholderTextColor={TEXT_MUTED}
       />
       <View style={styles.filterRow}>
         <TouchableOpacity
@@ -125,13 +138,15 @@ export default function SalesScreen({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
+  container: { flex: 1, backgroundColor: PAGE_BG },
   search: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: MUTED_CARD,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
     padding: 14,
     margin: 16,
-    color: '#0f172a',
+    color: TEXT,
     fontSize: 16,
   },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 12, gap: 8 },
@@ -139,17 +154,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
+    backgroundColor: MUTED_CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
-  chipActive: { backgroundColor: '#6366f1' },
-  chipText: { color: '#94a3b8', fontSize: 14 },
+  chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipText: { color: TEXT_SECONDARY, fontSize: 14 },
   chipTextActive: { color: '#fff', fontWeight: '600' },
   listContainer: { flex: 1 },
   list: { padding: 16, paddingBottom: 80 },
   sectionHeader: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#94a3b8',
+    color: TEXT_SECONDARY,
     marginTop: 16,
     marginBottom: 8,
     textTransform: 'uppercase',
@@ -159,27 +176,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
     padding: 16,
     marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
   rowLeft: { flex: 1 },
-  merchant: { fontSize: 16, fontWeight: '600', color: '#0f172a' },
-  meta: { fontSize: 13, color: '#94a3b8', marginTop: 4 },
+  merchant: { fontSize: 16, fontWeight: '600', color: TEXT },
+  meta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4 },
   rowRight: { alignItems: 'flex-end' },
-  amount: { fontSize: 16, fontWeight: '600', color: '#22c55e' },
-  deleteBtn: { fontSize: 12, color: '#ef4444', marginTop: 4 },
-  empty: { color: '#64748b', textAlign: 'center', marginTop: 40 },
+  amount: { fontSize: 16, fontWeight: '600', color: GREEN },
+  deleteBtn: { fontSize: 12, color: RED, marginTop: 4 },
+  empty: { color: TEXT_MUTED, textAlign: 'center', marginTop: 40 },
   fab: {
     position: 'absolute',
     bottom: 24,
     left: 20,
     right: 20,
-    backgroundColor: '#22c55e',
+    backgroundColor: GREEN,
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: 'center',
   },
-  fabText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
 });

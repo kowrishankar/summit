@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import {
-  View,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -8,9 +7,22 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  BORDER,
+  CARD_BG,
+  PAGE_BG,
+  PRIMARY,
+  PURPLE_DEEP,
+  TEXT,
+  TEXT_MUTED,
+  TEXT_SECONDARY,
+} from '../theme/design';
 
 export default function ResetPasswordScreen({
   navigation,
@@ -19,6 +31,7 @@ export default function ResetPasswordScreen({
   navigation: { navigate: (s: string) => void };
   route: { params?: { token?: string } };
 }) {
+  const insets = useSafeAreaInsets();
   const { resetPassword } = useAuth();
   const token = route.params?.token ?? '';
   const [password, setPassword] = useState('');
@@ -54,80 +67,81 @@ export default function ResetPasswordScreen({
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={styles.outer}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <AppText style={styles.title}>Reset password</AppText>
-      <AppText style={styles.subtitle}>Enter your new password</AppText>
-      <TextInput
-        style={styles.input}
-        placeholder="New password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        autoComplete="new-password"
-      />
-      <TextInput
-        style={styles.input}
-        placeholder="Confirm new password"
-        value={confirm}
-        onChangeText={setConfirm}
-        secureTextEntry
-        autoComplete="new-password"
-      />
-      <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <AppText style={styles.buttonText}>Update password</AppText>}
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <AppText style={styles.link}>Back to sign in</AppText>
-      </TouchableOpacity>
+      <ScrollView
+        contentContainerStyle={[
+          styles.container,
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <AppText style={styles.title}>Reset password</AppText>
+        <AppText style={styles.subtitle}>Enter your new password</AppText>
+        <TextInput
+          style={styles.input}
+          placeholder="New password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+          autoComplete="new-password"
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm new password"
+          value={confirm}
+          onChangeText={setConfirm}
+          secureTextEntry
+          autoComplete="new-password"
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <TouchableOpacity
+          activeOpacity={0.92}
+          onPress={handleSubmit}
+          disabled={loading}
+          style={styles.gradientWrap}
+        >
+          <LinearGradient
+            colors={[PRIMARY, PURPLE_DEEP]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.button}
+          >
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <AppText style={styles.buttonText}>Update password</AppText>
+            )}
+          </LinearGradient>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <AppText style={styles.link}>Back to sign in</AppText>
+        </TouchableOpacity>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#ffffff',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#0f172a',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#94a3b8',
-    marginBottom: 32,
-  },
+  outer: { flex: 1, backgroundColor: PAGE_BG },
+  container: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 24 },
+  title: { fontSize: 28, fontWeight: '800', color: TEXT, marginBottom: 8 },
+  subtitle: { fontSize: 16, fontWeight: '500', color: TEXT_SECONDARY, marginBottom: 32 },
   input: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
+    backgroundColor: CARD_BG,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
     padding: 16,
-    color: '#0f172a',
+    color: TEXT,
     marginBottom: 16,
     fontSize: 16,
   },
-  button: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  link: {
-    color: '#818cf8',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 8,
-  },
+  gradientWrap: { borderRadius: 14, overflow: 'hidden', marginTop: 8, marginBottom: 24 },
+  button: { paddingVertical: 16, alignItems: 'center', justifyContent: 'center' },
+  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  link: { color: PRIMARY, fontSize: 15, fontWeight: '600', textAlign: 'center', marginTop: 8 },
 });
