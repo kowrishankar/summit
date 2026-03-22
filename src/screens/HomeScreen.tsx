@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { formatAmount } from '../utils/currency';
-import { startOfWeek, startOfMonth, startOfYear, endOfMonth } from 'date-fns';
+import { startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, subWeeks, subMonths, subYears } from 'date-fns';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -89,6 +90,53 @@ export default function HomeScreen({
     });
     return { week, month, year };
   }, [sales]);
+
+  const previousPeriodSums = useMemo(() => {
+    const now = new Date();
+    const lastWeekStart = startOfWeek(subWeeks(now, 1));
+    const lastWeekEnd = endOfWeek(subWeeks(now, 1));
+    const lastWeekStartStr = lastWeekStart.toISOString().slice(0, 10);
+    const lastWeekEndStr = lastWeekEnd.toISOString().slice(0, 10);
+    const lastMonthStart = startOfMonth(subMonths(now, 1));
+    const lastMonthEnd = endOfMonth(subMonths(now, 1));
+    const lastMonthStartStr = lastMonthStart.toISOString().slice(0, 10);
+    const lastMonthEndStr = lastMonthEnd.toISOString().slice(0, 10);
+    const lastYearStart = startOfYear(subYears(now, 1));
+    const lastYearEnd = subYears(now, 1);
+    const lastYearStartStr = lastYearStart.toISOString().slice(0, 10);
+    const lastYearEndStr = lastYearEnd.toISOString().slice(0, 10);
+
+    let lastWeekSpend = 0;
+    let lastWeekIncome = 0;
+    let lastMonthSpend = 0;
+    let lastMonthIncome = 0;
+    let lastYearSpend = 0;
+    let lastYearIncome = 0;
+
+    invoices.forEach((inv) => {
+      const d = inv.extracted.date;
+      const amt = inv.extracted.amount ?? 0;
+      if (d && d >= lastWeekStartStr && d <= lastWeekEndStr) lastWeekSpend += amt;
+      if (d && d >= lastMonthStartStr && d <= lastMonthEndStr) lastMonthSpend += amt;
+      if (d && d >= lastYearStartStr && d <= lastYearEndStr) lastYearSpend += amt;
+    });
+    sales.forEach((s) => {
+      const d = s.extracted.date;
+      const amt = s.extracted.amount ?? 0;
+      if (d && d >= lastWeekStartStr && d <= lastWeekEndStr) lastWeekIncome += amt;
+      if (d && d >= lastMonthStartStr && d <= lastMonthEndStr) lastMonthIncome += amt;
+      if (d && d >= lastYearStartStr && d <= lastYearEndStr) lastYearIncome += amt;
+    });
+
+    return {
+      lastWeek: { spend: lastWeekSpend, income: lastWeekIncome },
+      lastMonth: { spend: lastMonthSpend, income: lastMonthIncome },
+      lastYearYTD: { spend: lastYearSpend, income: lastYearIncome },
+    };
+  }, [invoices, sales]);
+
+  const pctChange = (current: number, previous: number): number | null =>
+    previous === 0 ? null : Math.round(((current - previous) / previous) * 100);
 
   const yearIncomeSummary = useMemo(() => {
     let income = 0;
@@ -201,19 +249,32 @@ export default function HomeScreen({
     [weeklySpend]
   );
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {user?.email?.split('@')[0] ?? 'User'}</Text>
-          <Text style={styles.business}>{currentBusiness?.name ?? 'No business'}</Text>
-        </View>
-        <TouchableOpacity style={styles.switchBtn} onPress={() => navigation.navigate('BusinessSwitch')}>
-          <Text style={styles.switchBtnText}>Switch</Text>
-        </TouchableOpacity>
-      </View>
+  const renderChange = (
+    current: number,
+    previous: number,
+    inverse: boolean
+  ): { pct: number; isIncrease: boolean; good: boolean } | null => {
+    const pct = pctChange(current, previous);
+    if (pct === null) return null;
+    const isIncrease = pct > 0;
+    const good = inverse ? !isIncrease : isIncrease;
+    return { pct: Math.abs(pct), isIncrease, good };
+  };
 
-      <Text style={styles.sectionTitle}>Year</Text>
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
+      <View style={styles.content}>
+        <View style={styles.header}>
+          <View>
+            <AppText style={styles.greeting}>Hello, {user?.email?.split('@')[0] ?? 'User'}</AppText>
+            <AppText style={styles.business}>{currentBusiness?.name ?? 'No business'}</AppText>
+          </View>
+          <TouchableOpacity style={styles.switchBtn} onPress={() => navigation.navigate('BusinessSwitch')}>
+            <AppText style={styles.switchBtnText}>Switch</AppText>
+          </TouchableOpacity>
+        </View>
+
+        <AppText style={styles.sectionTitle}>Year</AppText>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -226,143 +287,238 @@ export default function HomeScreen({
             style={[styles.yearPill, selectedYear === y && styles.yearPillActive]}
             onPress={() => setSelectedYear(y)}
           >
-            <Text style={[styles.yearPillText, selectedYear === y && styles.yearPillTextActive]}>{y}</Text>
+            <AppText style={[styles.yearPillText, selectedYear === y && styles.yearPillTextActive]}>{y}</AppText>
           </TouchableOpacity>
         ))}
       </ScrollView>
 
-      <Text style={styles.sectionTitle}>Expenses</Text>
-      <View style={styles.cards}>
-        {isCurrentYear ? (
-          <>
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>This week</Text>
-              <Text style={styles.cardValue}>{formatCurrency(spendSummary.week)}</Text>
-            </View>
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>This month</Text>
-              <Text style={styles.cardValue}>{formatCurrency(spendSummary.month)}</Text>
-            </View>
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>This year</Text>
-              <Text style={styles.cardValue}>{formatCurrency(spendSummary.year)}</Text>
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>{selectedYear} expenses</Text>
-              <Text style={styles.cardValue}>{formatCurrency(yearSummary.spend)}</Text>
-            </View>
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>Tax {selectedYear}</Text>
-              <Text style={styles.cardValue}>{formatCurrency(yearSummary.tax)}</Text>
-            </View>
-            <View style={styles.card}>
-              <Text style={styles.cardLabel}>Invoices</Text>
-              <Text style={styles.cardValue}>{yearSummary.count}</Text>
-            </View>
-          </>
-        )}
-      </View>
+      {isCurrentYear && (
+        <View style={styles.netBanner}>
+          <AppText style={styles.netBannerLabel}>Net balance</AppText>
+          <AppText
+            style={[
+              styles.netBannerValue,
+              netYear >= 0 ? styles.netBannerPositive : styles.netBannerNegative,
+            ]}
+          >
+            {formatCurrency(netYear)}
+          </AppText>
+        </View>
+      )}
 
-      <Text style={styles.sectionTitle}>Income</Text>
-      <View style={styles.cards}>
-        {isCurrentYear ? (
-          <>
-            <View style={styles.cardIncome}>
-              <Text style={styles.cardLabel}>This week</Text>
-              <Text style={styles.cardValueIncome}>{formatCurrency(incomeSummary.week)}</Text>
-            </View>
-            <View style={styles.cardIncome}>
-              <Text style={styles.cardLabel}>This month</Text>
-              <Text style={styles.cardValueIncome}>{formatCurrency(incomeSummary.month)}</Text>
-            </View>
-            <View style={styles.cardIncome}>
-              <Text style={styles.cardLabel}>This year</Text>
-              <Text style={styles.cardValueIncome}>{formatCurrency(incomeSummary.year)}</Text>
-            </View>
-          </>
-        ) : (
-          <>
-            <View style={styles.cardIncome}>
-              <Text style={styles.cardLabel}>{selectedYear} income</Text>
-              <Text style={styles.cardValueIncome}>{formatCurrency(yearIncomeSummary.income)}</Text>
-            </View>
-            <View style={styles.cardIncome}>
-              <Text style={styles.cardLabel}>Sales</Text>
-              <Text style={styles.cardValueIncome}>{yearIncomeSummary.count}</Text>
-            </View>
-          </>
-        )}
-      </View>
+        <AppText style={styles.sectionTitle}>Expenses</AppText>
+        <View style={styles.cards}>
+          {isCurrentYear ? (
+            <>
+              <View style={styles.card}>
+                <AppText style={styles.cardLabel}>This week</AppText>
+                <AppText style={styles.cardValue}>{formatCurrency(spendSummary.week)}</AppText>
+                {(() => {
+                  const ch = renderChange(spendSummary.week, previousPeriodSums.lastWeek.spend, true);
+                  return ch ? (
+                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
+                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last week
+                    </AppText>
+                  ) : null;
+                })()}
+              </View>
+              <View style={styles.card}>
+                <AppText style={styles.cardLabel}>This month</AppText>
+                <AppText style={styles.cardValue}>{formatCurrency(spendSummary.month)}</AppText>
+                {(() => {
+                  const ch = renderChange(spendSummary.month, previousPeriodSums.lastMonth.spend, true);
+                  return ch ? (
+                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
+                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last month
+                    </AppText>
+                  ) : null;
+                })()}
+              </View>
+              <View style={styles.card}>
+                <AppText style={styles.cardLabel}>This year</AppText>
+                <AppText style={styles.cardValue}>{formatCurrency(spendSummary.year)}</AppText>
+                {(() => {
+                  const ch = renderChange(spendSummary.year, previousPeriodSums.lastYearYTD.spend, true);
+                  return ch ? (
+                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
+                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last year
+                    </AppText>
+                  ) : null;
+                })()}
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.card}>
+                <AppText style={styles.cardLabel}>{selectedYear} expenses</AppText>
+                <AppText style={styles.cardValue}>{formatCurrency(yearSummary.spend)}</AppText>
+              </View>
+              <View style={styles.card}>
+                <AppText style={styles.cardLabel}>Tax {selectedYear}</AppText>
+                <AppText style={styles.cardValue}>{formatCurrency(yearSummary.tax)}</AppText>
+              </View>
+              <View style={styles.card}>
+                <AppText style={styles.cardLabel}>Invoices</AppText>
+                <AppText style={styles.cardValue}>{yearSummary.count}</AppText>
+              </View>
+            </>
+          )}
+        </View>
 
-      <Text style={styles.sectionTitle}>Net</Text>
-      <View style={styles.netCard}>
-        {isCurrentYear && netCurrent ? (
-          <>
+        <AppText style={styles.sectionTitle}>Income</AppText>
+        <View style={styles.cards}>
+          {isCurrentYear ? (
+            <>
+              <View style={styles.cardIncome}>
+                <AppText style={styles.cardLabel}>This week</AppText>
+                <AppText style={styles.cardValueIncome}>{formatCurrency(incomeSummary.week)}</AppText>
+                {(() => {
+                  const ch = renderChange(incomeSummary.week, previousPeriodSums.lastWeek.income, false);
+                  return ch ? (
+                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
+                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last week
+                    </AppText>
+                  ) : null;
+                })()}
+              </View>
+              <View style={styles.cardIncome}>
+                <AppText style={styles.cardLabel}>This month</AppText>
+                <AppText style={styles.cardValueIncome}>{formatCurrency(incomeSummary.month)}</AppText>
+                {(() => {
+                  const ch = renderChange(incomeSummary.month, previousPeriodSums.lastMonth.income, false);
+                  return ch ? (
+                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
+                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last month
+                    </AppText>
+                  ) : null;
+                })()}
+              </View>
+              <View style={styles.cardIncome}>
+                <AppText style={styles.cardLabel}>This year</AppText>
+                <AppText style={styles.cardValueIncome}>{formatCurrency(incomeSummary.year)}</AppText>
+                {(() => {
+                  const ch = renderChange(incomeSummary.year, previousPeriodSums.lastYearYTD.income, false);
+                  return ch ? (
+                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
+                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last year
+                    </AppText>
+                  ) : null;
+                })()}
+              </View>
+            </>
+          ) : (
+            <>
+              <View style={styles.cardIncome}>
+                <AppText style={styles.cardLabel}>{selectedYear} income</AppText>
+                <AppText style={styles.cardValueIncome}>{formatCurrency(yearIncomeSummary.income)}</AppText>
+              </View>
+              <View style={styles.cardIncome}>
+                <AppText style={styles.cardLabel}>Sales</AppText>
+                <AppText style={styles.cardValueIncome}>{yearIncomeSummary.count}</AppText>
+              </View>
+            </>
+          )}
+        </View>
+
+        <AppText style={styles.sectionTitle}>Net</AppText>
+        <View style={styles.netCard}>
+          {isCurrentYear && netCurrent ? (
+            <>
+              <View style={styles.netRow}>
+                <AppText style={styles.netLabel}>This week</AppText>
+                <View>
+                  <AppText style={[styles.netValue, netCurrent.week >= 0 ? styles.netPositive : styles.netNegative]}>
+                    {formatCurrency(netCurrent.week)}
+                  </AppText>
+                  {(() => {
+                    const prev = previousPeriodSums.lastWeek.income - previousPeriodSums.lastWeek.spend;
+                    const ch = renderChange(netCurrent.week, prev, false);
+                    return ch ? (
+                      <AppText style={[styles.changeTextSmall, ch.good ? styles.changeUp : styles.changeDown]}>
+                        {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last week
+                      </AppText>
+                    ) : null;
+                  })()}
+                </View>
+              </View>
+              <View style={styles.netDivider} />
+              <View style={styles.netRow}>
+                <AppText style={styles.netLabel}>This month</AppText>
+                <View>
+                  <AppText style={[styles.netValue, netCurrent.month >= 0 ? styles.netPositive : styles.netNegative]}>
+                    {formatCurrency(netCurrent.month)}
+                  </AppText>
+                  {(() => {
+                    const prev = previousPeriodSums.lastMonth.income - previousPeriodSums.lastMonth.spend;
+                    const ch = renderChange(netCurrent.month, prev, false);
+                    return ch ? (
+                      <AppText style={[styles.changeTextSmall, ch.good ? styles.changeUp : styles.changeDown]}>
+                        {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last month
+                      </AppText>
+                    ) : null;
+                  })()}
+                </View>
+              </View>
+              <View style={styles.netDivider} />
+              <View style={styles.netRow}>
+                <AppText style={styles.netLabel}>This year</AppText>
+                <View>
+                  <AppText style={[styles.netValue, netCurrent.year >= 0 ? styles.netPositive : styles.netNegative]}>
+                    {formatCurrency(netCurrent.year)}
+                  </AppText>
+                  {(() => {
+                    const prev = previousPeriodSums.lastYearYTD.income - previousPeriodSums.lastYearYTD.spend;
+                    const ch = renderChange(netCurrent.year, prev, false);
+                    return ch ? (
+                      <AppText style={[styles.changeTextSmall, ch.good ? styles.changeUp : styles.changeDown]}>
+                        {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last year
+                      </AppText>
+                    ) : null;
+                  })()}
+                </View>
+              </View>
+            </>
+          ) : (
             <View style={styles.netRow}>
-              <Text style={styles.netLabel}>This week</Text>
-              <Text style={[styles.netValue, netCurrent.week >= 0 ? styles.netPositive : styles.netNegative]}>
-                {formatCurrency(netCurrent.week)}
-              </Text>
+              <AppText style={styles.netLabel}>{selectedYear} net</AppText>
+              <AppText style={[styles.netValue, netYear >= 0 ? styles.netPositive : styles.netNegative]}>
+                {formatCurrency(netYear)}
+              </AppText>
             </View>
-            <View style={styles.netDivider} />
-            <View style={styles.netRow}>
-              <Text style={styles.netLabel}>This month</Text>
-              <Text style={[styles.netValue, netCurrent.month >= 0 ? styles.netPositive : styles.netNegative]}>
-                {formatCurrency(netCurrent.month)}
-              </Text>
-            </View>
-            <View style={styles.netDivider} />
-            <View style={styles.netRow}>
-              <Text style={styles.netLabel}>This year</Text>
-              <Text style={[styles.netValue, netCurrent.year >= 0 ? styles.netPositive : styles.netNegative]}>
-                {formatCurrency(netCurrent.year)}
-              </Text>
-            </View>
-          </>
-        ) : (
-          <View style={styles.netRow}>
-            <Text style={styles.netLabel}>{selectedYear} net</Text>
-            <Text style={[styles.netValue, netYear >= 0 ? styles.netPositive : styles.netNegative]}>
-              {formatCurrency(netYear)}
-            </Text>
-          </View>
-        )}
-      </View>
+          )}
+        </View>
 
-      <Text style={styles.sectionTitle}>Tax paid</Text>
-      <View style={styles.taxRow}>
-        {isCurrentYear ? (
+        <AppText style={styles.sectionTitle}>Tax paid</AppText>
+        <View style={styles.taxRow}>
+          {isCurrentYear ? (
+            <>
+              <View style={styles.taxItem}>
+                <AppText style={styles.taxLabel}>Week</AppText>
+                <AppText style={styles.taxValue}>{formatCurrency(spendSummary.taxWeek)}</AppText>
+              </View>
+              <View style={styles.taxDivider} />
+              <View style={styles.taxItem}>
+                <AppText style={styles.taxLabel}>Month</AppText>
+                <AppText style={styles.taxValue}>{formatCurrency(spendSummary.taxMonth)}</AppText>
+              </View>
+              <View style={styles.taxDivider} />
+              <View style={styles.taxItem}>
+                <AppText style={styles.taxLabel}>Year</AppText>
+                <AppText style={styles.taxValue}>{formatCurrency(spendSummary.taxYear)}</AppText>
+              </View>
+            </>
+          ) : (
+            <View style={styles.taxItem}>
+              <AppText style={styles.taxLabel}>{selectedYear} tax</AppText>
+              <AppText style={styles.taxValue}>{formatCurrency(yearSummary.tax)}</AppText>
+            </View>
+          )}
+        </View>
+
+        {isCurrentYear && weeklySpend ? (
           <>
-            <View style={styles.taxItem}>
-              <Text style={styles.taxLabel}>Week</Text>
-              <Text style={styles.taxValue}>{formatCurrency(spendSummary.taxWeek)}</Text>
-            </View>
-            <View style={styles.taxDivider} />
-            <View style={styles.taxItem}>
-              <Text style={styles.taxLabel}>Month</Text>
-              <Text style={styles.taxValue}>{formatCurrency(spendSummary.taxMonth)}</Text>
-            </View>
-            <View style={styles.taxDivider} />
-            <View style={styles.taxItem}>
-              <Text style={styles.taxLabel}>Year</Text>
-              <Text style={styles.taxValue}>{formatCurrency(spendSummary.taxYear)}</Text>
-            </View>
-          </>
-        ) : (
-          <View style={styles.taxItem}>
-            <Text style={styles.taxLabel}>{selectedYear} tax</Text>
-            <Text style={styles.taxValue}>{formatCurrency(yearSummary.tax)}</Text>
-          </View>
-        )}
-      </View>
-
-      {isCurrentYear && weeklySpend ? (
-        <>
-          <Text style={styles.sectionTitle}>Spending this month</Text>
-          <View style={styles.chart}>
+            <AppText style={styles.sectionTitle}>Spending this month</AppText>
+            <View style={styles.chart}>
             {weeklySpend.map((w, i) => {
               const barHeightPct = maxWeekSpend > 0 ? w.total / maxWeekSpend : 0;
               const barHeight = Math.max(4, Math.round(barHeightPct * 100));
@@ -371,18 +527,18 @@ export default function HomeScreen({
                   <View style={styles.chartBarOuter}>
                     <View style={[styles.chartBar, { height: `${barHeight}%` }]} />
                   </View>
-                  <Text style={styles.chartBarLabel} numberOfLines={1}>{formatCurrency(w.total)}</Text>
-                  <Text style={styles.chartBarWeek}>{w.label}</Text>
+                  <AppText style={styles.chartBarLabel} numberOfLines={1}>{formatCurrency(w.total)}</AppText>
+                  <AppText style={styles.chartBarWeek}>{w.label}</AppText>
                 </View>
               );
             })}
           </View>
-          <Text style={styles.chartHint}>Week 1–7 · 8–14 · 15–21 · 22–28 · 29–31</Text>
-        </>
-      ) : (
-        <>
-          <Text style={styles.sectionTitle}>Spending by month · {selectedYear}</Text>
-          <View style={styles.chart}>
+            <AppText style={styles.chartHint}>Week 1–7 · 8–14 · 15–21 · 22–28 · 29–31</AppText>
+          </>
+        ) : (
+          <>
+            <AppText style={styles.sectionTitle}>Spending by month · {selectedYear}</AppText>
+            <View style={styles.chart}>
             {monthlySpend.map((m, i) => {
               const barHeightPct = maxMonthSpend > 0 ? m.total / maxMonthSpend : 0;
               const barHeight = Math.max(4, Math.round(barHeightPct * 100));
@@ -391,28 +547,28 @@ export default function HomeScreen({
                   <View style={styles.chartBarOuter}>
                     <View style={[styles.chartBar, { height: `${barHeight}%` }]} />
                   </View>
-                  <Text style={styles.chartBarLabel} numberOfLines={1}>{formatCurrency(m.total)}</Text>
-                  <Text style={styles.chartBarWeek}>{m.label}</Text>
+                  <AppText style={styles.chartBarLabel} numberOfLines={1}>{formatCurrency(m.total)}</AppText>
+                  <AppText style={styles.chartBarWeek}>{m.label}</AppText>
                 </View>
               );
             })}
-          </View>
-        </>
-      )}
+            </View>
+          </>
+        )}
 
-      <Text style={styles.sectionTitle}>Expenses by category {!isCurrentYear && `· ${selectedYear}`}</Text>
-      {spendingByCategory.length === 0 ? (
-        <Text style={styles.empty}>No expenses in {selectedYear}.</Text>
-      ) : (
-        <View style={styles.categoryList}>
+        <AppText style={styles.sectionTitle}>Expenses by category {!isCurrentYear && `· ${selectedYear}`}</AppText>
+        {spendingByCategory.length === 0 ? (
+          <AppText style={styles.empty}>No expenses in {selectedYear}.</AppText>
+        ) : (
+          <View style={styles.categoryList}>
           {spendingByCategory.map((cat) => {
             const pct = totalForCategories > 0 ? (cat.total / totalForCategories) * 100 : 0;
             return (
               <View key={`exp-${cat.id}`} style={styles.categoryRow}>
                 <View style={styles.categoryRowTop}>
                   <View style={[styles.categoryDot, cat.color ? { backgroundColor: cat.color } : null]} />
-                  <Text style={styles.categoryName}>{cat.name}</Text>
-                  <Text style={styles.categoryAmount}>{formatCurrency(cat.total)}</Text>
+                  <AppText style={styles.categoryName}>{cat.name}</AppText>
+                  <AppText style={styles.categoryAmount}>{formatCurrency(cat.total)}</AppText>
                 </View>
                 <View style={styles.categoryBarBg}>
                   <View
@@ -426,22 +582,22 @@ export default function HomeScreen({
               </View>
             );
           })}
-        </View>
-      )}
+          </View>
+        )}
 
-      <Text style={styles.sectionTitle}>Income by category {!isCurrentYear && `· ${selectedYear}`}</Text>
-      {incomeByCategory.length === 0 ? (
-        <Text style={styles.empty}>No income in {selectedYear}.</Text>
-      ) : (
-        <View style={styles.categoryList}>
+        <AppText style={styles.sectionTitle}>Income by category {!isCurrentYear && `· ${selectedYear}`}</AppText>
+        {incomeByCategory.length === 0 ? (
+          <AppText style={styles.empty}>No income in {selectedYear}.</AppText>
+        ) : (
+          <View style={styles.categoryList}>
           {incomeByCategory.map((cat) => {
             const pct = totalForIncomeCategories > 0 ? (cat.total / totalForIncomeCategories) * 100 : 0;
             return (
               <View key={`inc-${cat.id}`} style={styles.categoryRow}>
                 <View style={styles.categoryRowTop}>
                   <View style={[styles.categoryDotIncome, cat.color ? { backgroundColor: cat.color } : null]} />
-                  <Text style={styles.categoryName}>{cat.name}</Text>
-                  <Text style={styles.categoryAmountIncome}>{formatCurrency(cat.total)}</Text>
+                  <AppText style={styles.categoryName}>{cat.name}</AppText>
+                  <AppText style={styles.categoryAmountIncome}>{formatCurrency(cat.total)}</AppText>
                 </View>
                 <View style={styles.categoryBarBg}>
                   <View
@@ -455,22 +611,23 @@ export default function HomeScreen({
               </View>
             );
           })}
-        </View>
-      )}
+          </View>
+        )}
 
-      <Text style={styles.sectionTitle}>Quick access</Text>
-      <View style={styles.quickRow}>
-        <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Records', { screen: 'InvoicesList' })}>
-          <Text style={styles.quickNumber}>{invoices.length}</Text>
-          <Text style={styles.quickLabel}>Invoices</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Records', { screen: 'SalesList' })}>
-          <Text style={styles.quickNumberIncome}>{sales.length}</Text>
-          <Text style={styles.quickLabel}>Sales</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Reports')}>
-          <Text style={styles.quickLabel}>Reports</Text>
-        </TouchableOpacity>
+        <AppText style={styles.sectionTitle}>Quick access</AppText>
+        <View style={styles.quickRow}>
+          <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Records', { screen: 'InvoicesList' })}>
+            <AppText style={styles.quickNumber}>{invoices.length}</AppText>
+            <AppText style={styles.quickLabel}>Invoices</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Records', { screen: 'SalesList' })}>
+            <AppText style={styles.quickNumberIncome}>{sales.length}</AppText>
+            <AppText style={styles.quickLabel}>Sales</AppText>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Reports')}>
+            <AppText style={styles.quickLabel}>Reports</AppText>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -478,7 +635,25 @@ export default function HomeScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#ffffff' },
-  content: { padding: 20, paddingBottom: 100 },
+  contentContainer: { paddingBottom: 100 },
+  content: { padding: 20 },
+  netBanner: {
+    width: '100%',
+    backgroundColor: '#f1f5f9',
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+    marginBottom: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  netBannerLabel: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 4 },
+  netBannerValue: { fontSize: 28, fontWeight: '800' },
+  netBannerPositive: { color: '#22c55e' },
+  netBannerNegative: { color: '#ef4444' },
+  changeText: { fontSize: 11, marginTop: 4 },
+  changeTextSmall: { fontSize: 10, marginTop: 2 },
+  changeUp: { color: '#22c55e' },
+  changeDown: { color: '#ef4444' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',

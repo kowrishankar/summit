@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   SectionList,
   TouchableOpacity,
   TextInput,
   Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
 import { useAddPreferred } from '../contexts/AddPreferredContext';
@@ -47,16 +47,16 @@ export default function InvoicesScreen({
         onPress={() => navigation.navigate('InvoiceDetail', { invoiceId: item.id })}
       >
         <View style={styles.rowLeft}>
-          <Text style={styles.merchant} numberOfLines={1}>
+          <AppText style={styles.merchant} numberOfLines={1}>
             {item.extracted.merchantName ?? 'Unknown'}
-          </Text>
-          <Text style={styles.meta}>
+          </AppText>
+          <AppText style={styles.meta}>
             {item.extracted.date ? format(new Date(item.extracted.date), 'MMM d, yyyy') : '—'} ·{' '}
             {cat?.name ?? item.extracted.category ?? 'Uncategorised'}
-          </Text>
+          </AppText>
         </View>
         <View style={styles.rowRight}>
-          <Text style={styles.amount}>{formatAmount(item.extracted.amount ?? 0, item.extracted.currency)}</Text>
+          <AppText style={styles.amount}>{formatAmount(item.extracted.amount ?? 0, item.extracted.currency)}</AppText>
           <TouchableOpacity
             onPress={() =>
               Alert.alert('Delete invoice', 'Remove this invoice?', [
@@ -65,7 +65,7 @@ export default function InvoicesScreen({
               ])
             }
           >
-            <Text style={styles.deleteBtn}>Delete</Text>
+            <AppText style={styles.deleteBtn}>Delete</AppText>
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -86,7 +86,7 @@ export default function InvoicesScreen({
           style={[styles.chip, !filterCategoryId && styles.chipActive]}
           onPress={() => setFilterCategoryId(null)}
         >
-          <Text style={[styles.chipText, !filterCategoryId && styles.chipTextActive]}>All</Text>
+          <AppText style={[styles.chipText, !filterCategoryId && styles.chipTextActive]}>All</AppText>
         </TouchableOpacity>
         {categories.map((c) => (
           <TouchableOpacity
@@ -94,7 +94,7 @@ export default function InvoicesScreen({
             style={[styles.chip, filterCategoryId === c.id && styles.chipActive]}
             onPress={() => setFilterCategoryId(filterCategoryId === c.id ? null : c.id)}
           >
-            <Text style={[styles.chipText, filterCategoryId === c.id && styles.chipTextActive]}>{c.name}</Text>
+            <AppText style={[styles.chipText, filterCategoryId === c.id && styles.chipTextActive]}>{c.name}</AppText>
           </TouchableOpacity>
         ))}
       </View>
@@ -103,21 +103,21 @@ export default function InvoicesScreen({
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         renderSectionHeader={({ section: { title } }) => (
-          <Text style={styles.sectionHeader}>{title}</Text>
+          <AppText style={styles.sectionHeader}>{title}</AppText>
         )}
         contentContainerStyle={styles.list}
         stickySectionHeadersEnabled={false}
         ListEmptyComponent={
-          <Text style={styles.empty}>
+          <AppText style={styles.empty}>
             {invoices.length === 0 ? 'No invoices yet. Add one from Home.' : 'No matches.'}
-          </Text>
+          </AppText>
         }
       />
       <TouchableOpacity
         style={styles.fab}
         onPress={() => (navigation as { navigate: (a: string, b?: { screen: string }) => void }).navigate('Add', { screen: 'AddInvoiceRoot' })}
       >
-        <Text style={styles.fabText}>+ Add invoice</Text>
+        <AppText style={styles.fabText}>+ Add invoice</AppText>
       </TouchableOpacity>
     </View>
   );

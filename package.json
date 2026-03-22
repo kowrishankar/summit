@@ -4,9 +4,12 @@
   "main": "index.ts",
   "scripts": {
     "start": "expo start",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web"
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "web": "expo start --web",
+    "build:ios": "eas build --platform ios --profile production",
+    "build:ios:preview": "eas build --platform ios --profile preview",
+    "submit:ios": "eas submit --platform ios --latest"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -31,6 +34,7 @@
     "react-native-image-viewing": "^0.2.2",
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0",
     "react-native-webview": "^13.16.1",
     "uuid": "^13.0.0"
@@ -38,6 +42,7 @@
   "devDependencies": {
     "@types/react": "~19.1.10",
     "@types/uuid": "^10.0.0",
+    "eas-cli": "^16.28.0",
     "typescript": "~5.9.2"
   },
   "private": true

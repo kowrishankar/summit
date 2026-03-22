@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ResetPasswordScreen({
@@ -57,8 +57,8 @@ export default function ResetPasswordScreen({
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>Reset password</Text>
-      <Text style={styles.subtitle}>Enter your new password</Text>
+      <AppText style={styles.title}>Reset password</AppText>
+      <AppText style={styles.subtitle}>Enter your new password</AppText>
       <TextInput
         style={styles.input}
         placeholder="New password"
@@ -76,10 +76,10 @@ export default function ResetPasswordScreen({
         autoComplete="new-password"
       />
       <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Update password</Text>}
+        {loading ? <ActivityIndicator color="#fff" /> : <AppText style={styles.buttonText}>Update password</AppText>}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.link}>Back to sign in</Text>
+        <AppText style={styles.link}>Back to sign in</AppText>
       </TouchableOpacity>
     </KeyboardAvoidingView>
   );

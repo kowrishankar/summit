@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function LoginScreen({ navigation }: { navigation: { navigate: (s: string) => void } }) {
@@ -37,8 +37,8 @@ export default function LoginScreen({ navigation }: { navigation: { navigate: (s
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>Summit</Text>
-      <Text style={styles.subtitle}>Sign in to your account</Text>
+      <AppText style={styles.title}>Summit</AppText>
+      <AppText style={styles.subtitle}>Sign in to your account</AppText>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -57,13 +57,13 @@ export default function LoginScreen({ navigation }: { navigation: { navigate: (s
         autoComplete="password"
       />
       <TouchableOpacity style={styles.button} onPress={handleLogin} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign In</Text>}
+        {loading ? <ActivityIndicator color="#fff" /> : <AppText style={styles.buttonText}>Sign In</AppText>}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-        <Text style={styles.link}>Forgot password?</Text>
+        <AppText style={styles.link}>Forgot password?</AppText>
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
-        <Text style={styles.link}>Create an account</Text>
+        <AppText style={styles.link}>Create an account</AppText>
       </TouchableOpacity>
     </KeyboardAvoidingView>
   );

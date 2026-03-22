@@ -1,6 +1,24 @@
 const API_URL = process.env.EXPO_PUBLIC_STRIPE_API_URL || 'http://localhost:4242';
 const REQUEST_TIMEOUT_MS = 60000; // 60 seconds for Stripe + network
 
+/** Stripe returns "No such setupintent" if pk_test vs pk_live does not match the server's sk_test vs sk_live. */
+function assertPublishableKeyMatchesServerMode(stripeMode?: 'test' | 'live') {
+  if (!stripeMode) return;
+  const pk = (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '').trim();
+  const appTest = pk.startsWith('pk_test_');
+  const appLive = pk.startsWith('pk_live_');
+  if (stripeMode === 'test' && !appTest) {
+    throw new Error(
+      'Stripe mode mismatch: your server uses TEST secret keys (sk_test_…), but the app is not using a TEST publishable key (pk_test_…). In Stripe Dashboard, turn on Test mode and use matching Test keys on both the server (STRIPE_SECRET_KEY) and in the app (EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY).'
+    );
+  }
+  if (stripeMode === 'live' && !appLive) {
+    throw new Error(
+      'Stripe mode mismatch: your server uses LIVE secret keys (sk_live_…), but the app is not using a LIVE publishable key (pk_live_…). Use Live keys for both, or use Test for both while developing.'
+    );
+  }
+}
+
 async function fetchWithTimeout(
   url: string,
   options: RequestInit
@@ -51,8 +69,15 @@ async function postJson<T>(path: string, body: object): Promise<T> {
   return data as T;
 }
 
-export async function createSetupIntent(email: string): Promise<{ clientSecret: string; customerId: string }> {
-  return postJson('/create-setup-intent', { email });
+export async function createSetupIntent(
+  email: string
+): Promise<{ clientSecret: string; customerId: string; stripeMode?: 'test' | 'live' }> {
+  const data = await postJson<{ clientSecret: string; customerId: string; stripeMode?: 'test' | 'live' }>(
+    '/create-setup-intent',
+    { email }
+  );
+  assertPublishableKeyMatchesServerMode(data.stripeMode);
+  return data;
 }
 
 export async function createSubscription(customerId: string): Promise<{

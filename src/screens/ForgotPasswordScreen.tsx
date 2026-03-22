@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function ForgotPasswordScreen({
@@ -45,8 +45,8 @@ export default function ForgotPasswordScreen({
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>Forgot password</Text>
-      <Text style={styles.subtitle}>Enter your email to receive a reset link</Text>
+      <AppText style={styles.title}>Forgot password</AppText>
+      <AppText style={styles.subtitle}>Enter your email to receive a reset link</AppText>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -57,10 +57,10 @@ export default function ForgotPasswordScreen({
         autoComplete="email"
       />
       <TouchableOpacity style={styles.button} onPress={handleSubmit} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Send reset link</Text>}
+        {loading ? <ActivityIndicator color="#fff" /> : <AppText style={styles.buttonText}>Send reset link</AppText>}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.link}>Back to sign in</Text>
+        <AppText style={styles.link}>Back to sign in</AppText>
       </TouchableOpacity>
     </KeyboardAvoidingView>
   );

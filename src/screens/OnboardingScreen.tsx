@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -9,6 +8,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -64,8 +64,8 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
             <View style={styles.iconWrap}>
               <Ionicons name={slide.icon} size={64} color="#818cf8" />
             </View>
-            <Text style={styles.title}>{slide.title}</Text>
-            <Text style={styles.description}>{slide.description}</Text>
+            <AppText style={styles.title}>{slide.title}</AppText>
+            <AppText style={styles.description}>{slide.description}</AppText>
           </View>
         ))}
       </ScrollView>
@@ -83,10 +83,10 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
         {isLast ? (
           <>
             <TouchableOpacity style={styles.primaryButton} onPress={onSignUp} activeOpacity={0.8}>
-              <Text style={styles.primaryButtonText}>Sign up</Text>
+              <AppText style={styles.primaryButtonText}>Sign up</AppText>
             </TouchableOpacity>
             <TouchableOpacity style={styles.secondaryButton} onPress={onLogIn} activeOpacity={0.8}>
-              <Text style={styles.secondaryButtonText}>Already have an account? Log in</Text>
+              <AppText style={styles.secondaryButtonText}>Already have an account? Log in</AppText>
             </TouchableOpacity>
           </>
         ) : (
@@ -95,7 +95,7 @@ export default function OnboardingScreen({ onSignUp, onLogIn }: OnboardingScreen
             onPress={() => scrollRef.current?.scrollTo({ x: SCREEN_WIDTH * (index + 1), animated: true })}
             activeOpacity={0.8}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
+            <AppText style={styles.nextButtonText}>Next</AppText>
             <Ionicons name="arrow-forward" size={20} color="#0f172a" />
           </TouchableOpacity>
         )}

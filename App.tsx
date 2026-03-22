@@ -11,8 +11,11 @@ import MainTabs from './src/navigation/MainTabs';
 import SubscribeScreen from './src/screens/SubscribeScreen';
 import SplashScreen from './src/components/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import { ErrorBoundary } from './src/components/ErrorBoundary';
+import { isStripePublishableKeyConfigured } from './src/config/stripeEnv';
 
-const publishableKey = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
+const publishableKey = (process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '').trim();
+const stripeEnabled = isStripePublishableKeyConfigured();
 const ONBOARDING_SEEN_KEY = 'summit_onboarding_seen';
 
 function RootNavigator() {
@@ -70,18 +73,30 @@ function RootNavigator() {
   );
 }
 
+function AppNavigation() {
+  return (
+    <AuthProvider>
+      <NavigationContainer>
+        <RootNavigator />
+        <StatusBar style="light" />
+      </NavigationContainer>
+    </AuthProvider>
+  );
+}
+
 export default function App() {
   return (
-    <SafeAreaProvider>
-      <StripeProvider publishableKey={publishableKey}>
-        <AuthProvider>
-          <NavigationContainer>
-            <RootNavigator />
-            <StatusBar style="light" />
-          </NavigationContainer>
-        </AuthProvider>
-      </StripeProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        {stripeEnabled ? (
+          <StripeProvider publishableKey={publishableKey}>
+            <AppNavigation />
+          </StripeProvider>
+        ) : (
+          <AppNavigation />
+        )}
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
 

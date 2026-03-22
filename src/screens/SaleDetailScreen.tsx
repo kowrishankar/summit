@@ -1,7 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   Image,
@@ -14,6 +13,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
@@ -94,7 +94,7 @@ export default function SaleDetailScreen({
   if (!sale) {
     return (
       <View style={styles.container}>
-        <Text style={styles.empty}>Sale not found.</Text>
+        <AppText style={styles.empty}>Sale not found.</AppText>
       </View>
     );
   }
@@ -112,76 +112,76 @@ export default function SaleDetailScreen({
 
   const detailsContent = (
     <>
-      <Text style={styles.panelTitle}>Sale details</Text>
+      <AppText style={styles.panelTitle}>Sale details</AppText>
       <View style={styles.header}>
-        <Text style={styles.merchant}>{e.supplierName ?? e.merchantName ?? 'Unknown'}</Text>
-        <Text style={styles.amount}>{formatAmount(e.amount ?? 0, e.currency)}</Text>
+        <AppText style={styles.merchant}>{e.supplierName ?? e.merchantName ?? 'Unknown'}</AppText>
+        <AppText style={styles.amount}>{formatAmount(e.amount ?? 0, e.currency)}</AppText>
       </View>
       <View style={styles.meta}>
-        <Text style={styles.metaText}>
+        <AppText style={styles.metaText}>
           Date: {e.date ? format(new Date(e.date), 'MMM d, yyyy') : '—'}
-        </Text>
-        <Text style={styles.metaText}>Category: {category?.name ?? e.category ?? 'Uncategorised'}</Text>
+        </AppText>
+        <AppText style={styles.metaText}>Category: {category?.name ?? e.category ?? 'Uncategorised'}</AppText>
       </View>
       {(e.documentReference || e.currency || e.paymentType || e.ownedBy) ? (
         <View style={styles.detailsGrid}>
           {e.documentReference ? (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Reference</Text>
-              <Text style={styles.detailValue}>{e.documentReference}</Text>
+              <AppText style={styles.detailLabel}>Reference</AppText>
+              <AppText style={styles.detailValue}>{e.documentReference}</AppText>
             </View>
           ) : null}
           {e.currency ? (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Currency</Text>
-              <Text style={styles.detailValue}>{e.currency}</Text>
+              <AppText style={styles.detailLabel}>Currency</AppText>
+              <AppText style={styles.detailValue}>{e.currency}</AppText>
             </View>
           ) : null}
           {e.paymentType ? (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Payment</Text>
-              <Text style={styles.detailValue}>{e.paymentType}</Text>
+              <AppText style={styles.detailLabel}>Payment</AppText>
+              <AppText style={styles.detailValue}>{e.paymentType}</AppText>
             </View>
           ) : null}
           {e.ownedBy ? (
             <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Owned by</Text>
-              <Text style={styles.detailValue}>{e.ownedBy}</Text>
+              <AppText style={styles.detailLabel}>Owned by</AppText>
+              <AppText style={styles.detailValue}>{e.ownedBy}</AppText>
             </View>
           ) : null}
         </View>
       ) : null}
       {e.merchantName && e.merchantName !== e.supplierName ? (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Merchant</Text>
-          <Text style={styles.body}>{e.merchantName}</Text>
+          <AppText style={styles.sectionTitle}>Merchant</AppText>
+          <AppText style={styles.body}>{e.merchantName}</AppText>
         </View>
       ) : null}
       {(e.merchantAddress || e.merchantPhone || e.merchantEmail) && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Merchant</Text>
-          {e.merchantAddress ? <Text style={styles.body}>{e.merchantAddress}</Text> : null}
-          {e.merchantPhone ? <Text style={styles.body}>{e.merchantPhone}</Text> : null}
-          {e.merchantEmail ? <Text style={styles.body}>{e.merchantEmail}</Text> : null}
+          <AppText style={styles.sectionTitle}>Merchant</AppText>
+          {e.merchantAddress ? <AppText style={styles.body}>{e.merchantAddress}</AppText> : null}
+          {e.merchantPhone ? <AppText style={styles.body}>{e.merchantPhone}</AppText> : null}
+          {e.merchantEmail ? <AppText style={styles.body}>{e.merchantEmail}</AppText> : null}
         </View>
       )}
       {e.vatAmount != null && e.vatAmount > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>VAT</Text>
-          <Text style={styles.body}>{formatAmount(e.vatAmount, e.currency)}</Text>
+          <AppText style={styles.sectionTitle}>VAT</AppText>
+          <AppText style={styles.body}>{formatAmount(e.vatAmount, e.currency)}</AppText>
         </View>
       )}
       {e.lineItems && e.lineItems.length > 0 && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Line items</Text>
+          <AppText style={styles.sectionTitle}>Line items</AppText>
           {e.lineItems.map((item) => (
             <View key={item.id} style={styles.lineRow}>
-              <Text style={styles.lineDesc}>{item.description}</Text>
-              <Text style={styles.lineQty}>Qty: {item.quantity}</Text>
-              <Text style={styles.linePrice}>
+              <AppText style={styles.lineDesc}>{item.description}</AppText>
+              <AppText style={styles.lineQty}>Qty: {item.quantity}</AppText>
+              <AppText style={styles.linePrice}>
                 {formatAmount(item.totalPrice ?? 0, e.currency)}
                 {item.taxAmount != null && item.taxAmount > 0 && ` (tax: ${formatAmount(item.taxAmount, e.currency)})`}
-              </Text>
+              </AppText>
             </View>
           ))}
         </View>
@@ -205,9 +205,9 @@ export default function SaleDetailScreen({
               >
                 {docImageUris.map((uri, index) => (
                   <View key={`${uri}-${index}`} style={styles.docSectionWrap}>
-                    <Text style={styles.docSectionLabel}>
+                    <AppText style={styles.docSectionLabel}>
                       Part {index + 1} of {docImageUris.length}
-                    </Text>
+                    </AppText>
                     <Image source={{ uri }} style={styles.docSectionImage} resizeMode="contain" />
                   </View>
                 ))}
@@ -225,7 +225,7 @@ export default function SaleDetailScreen({
         ) : (sale.fileUri || (sale.fileUris && sale.fileUris.length > 0)) && isPdf ? (
           (() => {
             const pdfUri = sale.fileUri ?? sale.fileUris?.[0];
-            if (!pdfUri) return <View style={styles.pdfPlaceholder}><Text style={styles.pdfPlaceholderText}>No PDF</Text></View>;
+            if (!pdfUri) return <View style={styles.pdfPlaceholder}><AppText style={styles.pdfPlaceholderText}>No PDF</AppText></View>;
             return (
               <View style={styles.pdfWebViewContainer}>
                 <WebView
@@ -245,14 +245,14 @@ export default function SaleDetailScreen({
                   activeOpacity={0.8}
                 >
                   <Ionicons name="expand-outline" size={22} color="#f8fafc" />
-                  <Text style={styles.viewPdfButtonText}>Expand</Text>
+                  <AppText style={styles.viewPdfButtonText}>Expand</AppText>
                 </TouchableOpacity>
               </View>
             );
           })()
         ) : (
           <View style={styles.noDocPlaceholder}>
-            <Text style={styles.noDocText}>No document preview</Text>
+            <AppText style={styles.noDocText}>No document preview</AppText>
           </View>
         )}
       </View>
@@ -286,7 +286,7 @@ export default function SaleDetailScreen({
               activeOpacity={0.8}
             >
               <Ionicons name="contract-outline" size={22} color="#f8fafc" />
-              <Text style={styles.fullscreenCloseText}>Exit full screen</Text>
+              <AppText style={styles.fullscreenCloseText}>Exit full screen</AppText>
             </TouchableOpacity>
           )}
         />
@@ -317,7 +317,7 @@ export default function SaleDetailScreen({
               activeOpacity={0.8}
             >
               <Ionicons name="contract-outline" size={22} color="#f8fafc" />
-              <Text style={styles.pdfExitButtonText}>Exit</Text>
+              <AppText style={styles.pdfExitButtonText}>Exit</AppText>
             </TouchableOpacity>
           </View>
         </Modal>

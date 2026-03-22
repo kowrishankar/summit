@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   TextInput,
@@ -9,6 +8,7 @@ import {
   Alert,
   FlatList,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import type { BusinessAccount } from '../types';
 
@@ -39,7 +39,7 @@ export default function BusinessSwitchScreen({
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Business accounts</Text>
+      <AppText style={styles.title}>Business accounts</AppText>
       <FlatList
         data={businesses}
         keyExtractor={(item) => item.id}
@@ -49,19 +49,19 @@ export default function BusinessSwitchScreen({
             style={[styles.row, currentBusiness?.id === item.id && styles.rowActive]}
             onPress={() => handleSwitch(item)}
           >
-            <Text style={styles.name}>{item.name}</Text>
-            {currentBusiness?.id === item.id && <Text style={styles.badge}>Current</Text>}
+            <AppText style={styles.name}>{item.name}</AppText>
+            {currentBusiness?.id === item.id && <AppText style={styles.badge}>Current</AppText>}
           </TouchableOpacity>
         )}
       />
       <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-        <Text style={styles.fabText}>+ Add business</Text>
+        <AppText style={styles.fabText}>+ Add business</AppText>
       </TouchableOpacity>
 
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>New business</Text>
+            <AppText style={styles.modalTitle}>New business</AppText>
             <TextInput
               style={styles.input}
               placeholder="Business name"
@@ -71,10 +71,10 @@ export default function BusinessSwitchScreen({
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.modalBtnText}>Cancel</Text>
+                <AppText style={styles.modalBtnText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={handleAdd}>
-                <Text style={styles.modalBtnTextPrimary}>Add</Text>
+                <AppText style={styles.modalBtnTextPrimary}>Add</AppText>
               </TouchableOpacity>
             </View>
           </View>

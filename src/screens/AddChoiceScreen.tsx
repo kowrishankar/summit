@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, TouchableOpacity } from 'react-native';
+import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -12,8 +13,8 @@ export default function AddChoiceScreen({
 
   return (
     <View style={[styles.container, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
-      <Text style={styles.title}>Add</Text>
-      <Text style={styles.subtitle}>Is this an invoice (expense) or a sale (income)?</Text>
+      <AppText style={styles.title}>Add</AppText>
+      <AppText style={styles.subtitle}>Is this an invoice (expense) or a sale (income)?</AppText>
 
       <TouchableOpacity
         style={styles.card}
@@ -23,8 +24,8 @@ export default function AddChoiceScreen({
         <View style={styles.cardIconWrap}>
           <Ionicons name="document-text-outline" size={36} color="#6366f1" />
         </View>
-        <Text style={styles.cardTitle}>Invoice (expense)</Text>
-        <Text style={styles.cardDesc}>Upload receipt or invoice for money spent</Text>
+        <AppText style={styles.cardTitle}>Invoice (expense)</AppText>
+        <AppText style={styles.cardDesc}>Upload receipt or invoice for money spent</AppText>
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -35,8 +36,8 @@ export default function AddChoiceScreen({
         <View style={[styles.cardIconWrap, styles.cardIconGreen]}>
           <Ionicons name="trending-up-outline" size={36} color="#22c55e" />
         </View>
-        <Text style={styles.cardTitle}>Sale (income)</Text>
-        <Text style={styles.cardDesc}>Upload document for money received</Text>
+        <AppText style={styles.cardTitle}>Sale (income)</AppText>
+        <AppText style={styles.cardDesc}>Upload document for money received</AppText>
       </TouchableOpacity>
     </View>
   );

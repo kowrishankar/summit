@@ -22,7 +22,19 @@ export async function signIn(email: string, password: string): Promise<User | nu
     email: email.trim(),
     password,
   });
-  if (error) return null;
+  if (error) {
+    if (__DEV__) {
+      const msg = error.message?.toLowerCase() ?? '';
+      if (msg.includes('network') || msg.includes('fetch')) {
+        console.error(
+          '[signIn] Cannot reach Supabase. Check EXPO_PUBLIC_SUPABASE_URL in .env (https://…supabase.co), device internet, VPN/firewall, then restart: npx expo start --clear'
+        );
+      } else {
+        console.error('[signIn]', error.name, error.message);
+      }
+    }
+    return null;
+  }
   if (!data.user) return null;
   return mapAuthUser(data.user);
 }

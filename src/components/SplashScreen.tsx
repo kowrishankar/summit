@@ -1,11 +1,12 @@
 import React from 'react';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import AppText from './AppText';
 
 export default function SplashScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.appName}>Summit</Text>
-      <Text style={styles.tagline}>Your finances, one view.</Text>
+      <AppText style={styles.appName}>Summit</AppText>
+      <AppText style={styles.tagline}>Your finances, one view.</AppText>
       <ActivityIndicator size="large" color="#818cf8" style={styles.spinner} />
     </View>
   );

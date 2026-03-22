@@ -53,3 +53,22 @@ Auth and all app data (users, businesses, invoices, sales, categories, subscript
 - Merchant: name, address, phone, email, website  
 - VAT amount, category, total amount, date  
 - Line items: description, quantity, unit price, total price, tax rate/amount/type  
+
+## Publishing iOS (App Store / TestFlight)
+
+Production builds use **EAS Build**. See **[docs/PUBLISHING-IOS.md](docs/PUBLISHING-IOS.md)** for full steps.
+
+```bash
+npm install
+npx eas-cli login
+npx eas-cli init   # first time only — links project and adds EAS projectId
+npm run build:ios  # production .ipa on Expo’s servers
+npm run submit:ios # upload latest build to App Store Connect (after credentials are set)
+```
+
+Configure **`EXPO_PUBLIC_*` env vars** in the [Expo dashboard](https://expo.dev): each build profile in **`eas.json`** sets **`environment`** (`preview`, `production`, …). Those names must match the **Preview / Production / Development** toggles on each variable (see **docs/PUBLISHING-IOS.md §4**). Local `.env` is not used on EAS unless you wire it.
+
+## Future
+- Group transactions with what card they paid
+- Better dashboard page
+- Group by vendors or receipents

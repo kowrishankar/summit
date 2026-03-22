@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { TouchableOpacity, Text, View, StyleSheet, Modal, Pressable } from 'react-native';
+import { TouchableOpacity, View, StyleSheet, Modal, Pressable } from 'react-native';
+import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -59,7 +60,7 @@ function RecordsStack() {
                 onPress={() => navigation.navigate('EditInvoice', { invoiceId: params.invoiceId })}
                 style={{ marginRight: 16 }}
               >
-                <Text style={{ color: '#6366f1', fontWeight: '600', fontSize: 16 }}>Edit</Text>
+                <AppText style={{ color: '#6366f1', fontWeight: '600', fontSize: 16 }}>Edit</AppText>
               </TouchableOpacity>
             );
           },
@@ -107,7 +108,7 @@ function RecordsTabBarPopup({
             activeOpacity={0.7}
           >
             <Ionicons name="document-text-outline" size={20} color="#818cf8" />
-            <Text style={popupStyles.optionText}>Invoices</Text>
+            <AppText style={popupStyles.optionText}>Invoices</AppText>
           </TouchableOpacity>
           <TouchableOpacity
             style={popupStyles.option}
@@ -118,7 +119,7 @@ function RecordsTabBarPopup({
             activeOpacity={0.7}
           >
             <Ionicons name="trending-up-outline" size={20} color="#22c55e" />
-            <Text style={popupStyles.optionText}>Sales</Text>
+            <AppText style={popupStyles.optionText}>Sales</AppText>
           </TouchableOpacity>
         </View>
       </Pressable>
@@ -209,7 +210,7 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
               activeOpacity={0.7}
             >
               <Ionicons name={iconName as 'home'} size={name === 'Add' ? 28 : 24} color={color} />
-              <Text style={[tabBarStyles.label, { color }]}>{label}</Text>
+              <AppText style={[tabBarStyles.label, { color }]}>{label}</AppText>
             </TouchableOpacity>
           );
         })}

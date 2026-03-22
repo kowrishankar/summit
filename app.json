@@ -14,15 +14,19 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.summit.app",
+      "bundleIdentifier": "com.jfnagroup.summit",
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSAllowsLocalNetworking": true
-        }
+        },
+        "NSCameraUsageDescription": "Summit uses the camera to capture invoices and sales documents.",
+        "NSPhotoLibraryUsageDescription": "Summit uses your photo library to attach invoice and sale images.",
+        "NSPhotoLibraryAddUsageDescription": "Summit can save exported images to your library when you choose to.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.summit.app",
+      "package": "com.jfnagroup.summit",
       "usesCleartextTraffic": true,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -36,12 +40,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      [
-        "@stripe/stripe-react-native",
-        {
-          "merchantIdentifier": "merchant.com.summit"
-        }
-      ]
-    ]
+      ["@stripe/stripe-react-native", {}],
+      "./plugins/removeInAppPaymentsEntitlement.js"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e27fef02-d43b-43a5-80f9-c496c975630a"
+      }
+    }
   }
 }

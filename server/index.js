@@ -83,15 +83,22 @@ app.post('/create-setup-intent', async (req, res) => {
       });
     }
 
+    // Use explicit card — works reliably with @stripe/stripe-react-native PaymentSheet (saves a card for subscriptions).
     const setupIntent = await stripe.setupIntents.create({
       customer: customer.id,
       usage: 'off_session',
-      automatic_payment_methods: { enabled: true },
+      payment_method_types: ['card'],
     });
+
+    if (!setupIntent.client_secret) {
+      return res.status(500).json({ error: 'SetupIntent missing client_secret' });
+    }
 
     return res.status(200).json({
       clientSecret: setupIntent.client_secret,
       customerId: customer.id,
+      /** App must use pk_test_* with sk_test_* or pk_live_* with sk_live_* from the same Stripe account. */
+      stripeMode: isTestKey ? 'test' : 'live',
     });
   } catch (e) {
     console.error('create-setup-intent', e);

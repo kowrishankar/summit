@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   TextInput,
   TouchableOpacity,
   StyleSheet,
@@ -10,6 +9,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function SignupScreen({ navigation }: { navigation: { navigate: (s: string) => void } }) {
@@ -52,8 +52,8 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <Text style={styles.title}>Create account</Text>
-      <Text style={styles.subtitle}>Sign up for Summit</Text>
+      <AppText style={styles.title}>Create account</AppText>
+      <AppText style={styles.subtitle}>Sign up for Summit</AppText>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -79,8 +79,8 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
         secureTextEntry
         autoComplete="new-password"
       />
-      <Text style={styles.paymentHint}>Next step: add your payment method for £14.99/month.</Text>
-      <Text style={styles.sectionLabel}>Business details</Text>
+      <AppText style={styles.paymentHint}>Next step: add your payment method for £14.99/month.</AppText>
+      <AppText style={styles.sectionLabel}>Business details</AppText>
       <TextInput
         style={styles.input}
         placeholder="Business name *"
@@ -96,10 +96,10 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
         placeholderTextColor="#64748b"
       />
       <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
-        {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>Sign Up</Text>}
+        {loading ? <ActivityIndicator color="#fff" /> : <AppText style={styles.buttonText}>Sign Up</AppText>}
       </TouchableOpacity>
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.link}>Already have an account? Sign in</Text>
+        <AppText style={styles.link}>Already have an account? Sign in</AppText>
       </TouchableOpacity>
     </KeyboardAvoidingView>
   );

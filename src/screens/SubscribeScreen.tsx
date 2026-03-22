@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -9,14 +8,48 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useAuth } from '../contexts/AuthContext';
+import { isStripePublishableKeyConfigured } from '../config/stripeEnv';
 import { createSetupIntent, createSubscription, confirmSubscription } from '../services/stripeApi';
 import { createSubscriptionFromStripe, hasActiveAccess } from '../services/subscription';
 
+/** Shown on EAS builds when EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY was not set at build time. */
+function SubscribeScreenStripeNotConfigured() {
+  const insets = useSafeAreaInsets();
+  return (
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.scrollContent,
+        {
+          paddingTop: Math.max(24, insets.top),
+          paddingBottom: Math.max(48, insets.bottom),
+        },
+      ]}
+    >
+      <AppText style={styles.title}>Payment not configured</AppText>
+      <AppText style={styles.tagline}>
+        This build was created without a Stripe publishable key. Add EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY (and your other EXPO_PUBLIC_* vars) in the Expo dashboard under Environment variables for this project, then create a new build.
+      </AppText>
+      <AppText style={styles.cancelNote}>
+        Supabase keys must also be set the same way or login and data will not work.
+      </AppText>
+    </ScrollView>
+  );
+}
+
 export default function SubscribeScreen() {
+  if (!isStripePublishableKeyConfigured()) {
+    return <SubscribeScreenStripeNotConfigured />;
+  }
+  return <SubscribeScreenWithStripe />;
+}
+
+function SubscribeScreenWithStripe() {
   const insets = useSafeAreaInsets();
   const { user, refreshSubscription } = useAuth();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
@@ -39,14 +72,23 @@ export default function SubscribeScreen() {
         returnURL,
       });
       if (initError) {
-        Alert.alert('Error', initError.message ?? 'Could not initialize payment.');
+        const hint =
+          /no such setupintent|resource_missing/i.test(initError.message ?? '')
+            ? '\n\nUsually: app publishable key (pk_test_/pk_live_) must match your server secret key mode from the same Stripe account.'
+            : '';
+        Alert.alert('Error', (initError.message ?? 'Could not initialize payment.') + hint);
         setLoading(false);
         return;
       }
       const { error: presentError } = await presentPaymentSheet();
       if (presentError) {
         if (presentError.code !== 'Canceled') {
-          Alert.alert('Payment failed', presentError.message ?? 'Could not add card.');
+          const msg = presentError.message ?? 'Could not add card.';
+          const hint =
+            /no such setupintent|resource_missing/i.test(msg)
+              ? '\n\nCheck Stripe Dashboard Test/Live toggle: use sk_test_ + pk_test_ together, or sk_live_ + pk_live_, on server and in the app env.'
+              : '';
+          Alert.alert('Payment failed', msg + hint);
         }
         setLoading(false);
         return;
@@ -125,41 +167,41 @@ export default function SubscribeScreen() {
       ]}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>Subscribe to Summit</Text>
-      <Text style={styles.tagline}>Less admin. Better control. One place for all your invoices.</Text>
+      <AppText style={styles.title}>Subscribe to Summit</AppText>
+      <AppText style={styles.tagline}>Less admin. Better control. One place for all your invoices.</AppText>
 
       <View style={styles.benefitsCard}>
-        <Text style={styles.benefitsTitle}>What you get</Text>
+        <AppText style={styles.benefitsTitle}>What you get</AppText>
         {benefits.map((item, index) => (
           <View key={index} style={styles.benefitRow}>
             <Ionicons name={item.icon} size={22} color="#6366f1" style={styles.benefitIcon} />
-            <Text style={styles.benefitText}>{item.text}</Text>
+            <AppText style={styles.benefitText}>{item.text}</AppText>
           </View>
         ))}
       </View>
 
       <View style={styles.priceBlock}>
-        <Text style={styles.price}>£14.99</Text>
-        <Text style={styles.pricePeriod}>per month</Text>
+        <AppText style={styles.price}>£14.99</AppText>
+        <AppText style={styles.pricePeriod}>per month</AppText>
       </View>
-      <Text style={styles.cancelNote}>Cancel anytime in Settings. No long-term commitment.</Text>
+      <AppText style={styles.cancelNote}>Cancel anytime in Settings. No long-term commitment.</AppText>
 
       {!isWeb && (
-        <Text style={styles.twoStepNote}>
+        <AppText style={styles.twoStepNote}>
           You may see two steps: first add your card, then confirm your first payment (e.g. 3D Secure). Both are required to start your subscription.
-        </Text>
+        </AppText>
       )}
 
       {isWeb ? (
-        <Text style={styles.webNote}>
+        <AppText style={styles.webNote}>
           Payment is supported in the iOS or Android app. Please open this app on your device to subscribe.
-        </Text>
+        </AppText>
       ) : (
         <TouchableOpacity style={styles.button} onPress={handleSubscribe} disabled={loading}>
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>Add payment method & subscribe</Text>
+            <AppText style={styles.buttonText}>Add payment method & subscribe</AppText>
           )}
         </TouchableOpacity>
       )}

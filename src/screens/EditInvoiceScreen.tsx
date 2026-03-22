@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
   TextInput,
@@ -9,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import type { ExtractedInvoiceData } from '../types';
 
@@ -46,7 +46,7 @@ export default function EditInvoiceScreen({
   if (!invoice) {
     return (
       <View style={styles.container}>
-        <Text style={styles.empty}>Invoice not found.</Text>
+        <AppText style={styles.empty}>Invoice not found.</AppText>
       </View>
     );
   }
@@ -97,9 +97,9 @@ export default function EditInvoiceScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.sectionTitle}>Receipt / Invoice details</Text>
+      <AppText style={styles.sectionTitle}>Receipt / Invoice details</AppText>
 
-      <Text style={labelStyle}>Date</Text>
+      <AppText style={labelStyle}>Date</AppText>
       <TextInput
         style={inputStyle}
         placeholder="YYYY-MM-DD"
@@ -108,7 +108,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Merchant name</Text>
+      <AppText style={labelStyle}>Merchant name</AppText>
       <TextInput
         style={inputStyle}
         placeholder="Merchant or vendor name"
@@ -117,7 +117,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Supplier name (optional)</Text>
+      <AppText style={labelStyle}>Supplier name (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="Supplier name if different"
@@ -126,7 +126,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Document reference (optional)</Text>
+      <AppText style={labelStyle}>Document reference (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="Invoice number / reference"
@@ -135,7 +135,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Amount</Text>
+      <AppText style={labelStyle}>Amount</AppText>
       <TextInput
         style={inputStyle}
         placeholder="0.00"
@@ -145,7 +145,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Currency</Text>
+      <AppText style={labelStyle}>Currency</AppText>
       <TextInput
         style={inputStyle}
         placeholder="USD, EUR, GBP..."
@@ -155,7 +155,7 @@ export default function EditInvoiceScreen({
         autoCapitalize="characters"
       />
 
-      <Text style={labelStyle}>VAT / Tax amount (optional)</Text>
+      <AppText style={labelStyle}>VAT / Tax amount (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="0.00"
@@ -165,7 +165,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Merchant address (optional)</Text>
+      <AppText style={labelStyle}>Merchant address (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="Address"
@@ -174,7 +174,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Merchant phone (optional)</Text>
+      <AppText style={labelStyle}>Merchant phone (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="Phone"
@@ -184,7 +184,7 @@ export default function EditInvoiceScreen({
         keyboardType="phone-pad"
       />
 
-      <Text style={labelStyle}>Merchant email (optional)</Text>
+      <AppText style={labelStyle}>Merchant email (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="Email"
@@ -194,7 +194,7 @@ export default function EditInvoiceScreen({
         keyboardType="email-address"
       />
 
-      <Text style={labelStyle}>Payment type (optional)</Text>
+      <AppText style={labelStyle}>Payment type (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="e.g. Card, Bank transfer, Cash"
@@ -203,7 +203,7 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Owned by / Customer (optional)</Text>
+      <AppText style={labelStyle}>Owned by / Customer (optional)</AppText>
       <TextInput
         style={inputStyle}
         placeholder="Customer or billed to"
@@ -212,13 +212,13 @@ export default function EditInvoiceScreen({
         placeholderTextColor="#64748b"
       />
 
-      <Text style={labelStyle}>Category</Text>
+      <AppText style={labelStyle}>Category</AppText>
       <View style={styles.chipRow}>
         <TouchableOpacity
           style={[styles.chip, !categoryId && styles.chipActive]}
           onPress={() => setCategoryId(null)}
         >
-          <Text style={[styles.chipText, !categoryId && styles.chipTextActive]}>None</Text>
+          <AppText style={[styles.chipText, !categoryId && styles.chipTextActive]}>None</AppText>
         </TouchableOpacity>
         {categories.map((c) => (
           <TouchableOpacity
@@ -226,7 +226,7 @@ export default function EditInvoiceScreen({
             style={[styles.chip, categoryId === c.id && styles.chipActive]}
             onPress={() => setCategoryId(categoryId === c.id ? null : c.id)}
           >
-            <Text style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>{c.name}</Text>
+            <AppText style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>{c.name}</AppText>
           </TouchableOpacity>
         ))}
       </View>
@@ -235,7 +235,7 @@ export default function EditInvoiceScreen({
         {saving ? (
           <ActivityIndicator color="#fff" />
         ) : (
-          <Text style={styles.saveBtnText}>Save changes</Text>
+          <AppText style={styles.saveBtnText}>Save changes</AppText>
         )}
       </TouchableOpacity>
     </ScrollView>

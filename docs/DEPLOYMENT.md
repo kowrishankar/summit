@@ -41,8 +41,8 @@ This creates or updates `eas.json` and ensures the project is ready for cloud bu
 
 In **`app.json`** you should have:
 
-- **iOS:** `expo.ios.bundleIdentifier` (e.g. `com.summit.app`)
-- **Android:** `expo.android.package` (e.g. `com.summit.app`)
+- **iOS:** `expo.ios.bundleIdentifier` (e.g. `com.jfnagroup.summit`)
+- **Android:** `expo.android.package` (e.g. `com.jfnagroup.summit`)
 
 These must be unique and match what you use in App Store Connect and Google Play Console. Change them if you use a different domain/app name.
 

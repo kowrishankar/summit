@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   Alert,
@@ -12,6 +11,7 @@ import {
   ActivityIndicator,
   Linking,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import {
@@ -142,40 +142,40 @@ export default function SettingsScreen() {
     >
       <ScrollView contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
         <View style={styles.section}>
-          <Text style={styles.label}>Account</Text>
-          <Text style={styles.value}>{user?.email ?? '—'}</Text>
+          <AppText style={styles.label}>Account</AppText>
+          <AppText style={styles.value}>{user?.email ?? '—'}</AppText>
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Subscription</Text>
-          <Text style={styles.hint}>Your monthly plan and billing.</Text>
+          <AppText style={styles.sectionTitle}>Subscription</AppText>
+          <AppText style={styles.hint}>Your monthly plan and billing.</AppText>
           {subLoading ? (
             <ActivityIndicator color="#94a3b8" style={styles.subLoader} />
           ) : subscription ? (
             <>
               <View style={styles.subRow}>
-                <Text style={styles.subLabel}>Plan</Text>
-                <Text style={styles.subValue}>{formatPrice(subscription)}/month</Text>
+                <AppText style={styles.subLabel}>Plan</AppText>
+                <AppText style={styles.subValue}>{formatPrice(subscription)}/month</AppText>
               </View>
               <View style={styles.subRow}>
-                <Text style={styles.subLabel}>Status</Text>
-                <Text style={styles.subValue}>
+                <AppText style={styles.subLabel}>Status</AppText>
+                <AppText style={styles.subValue}>
                   {subscription.status === 'active'
                     ? 'Active'
                     : subscription.status === 'cancel_at_period_end'
                       ? 'Cancelling at period end'
                       : 'Ended'}
-                </Text>
+                </AppText>
               </View>
               <View style={styles.subRow}>
-                <Text style={styles.subLabel}>
+                <AppText style={styles.subLabel}>
                   {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}
-                </Text>
-                <Text style={styles.subValue}>
+                </AppText>
+                <AppText style={styles.subValue}>
                   {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, {
                     dateStyle: 'long',
                   })}
-                </Text>
+                </AppText>
               </View>
               {subscription.stripeCustomerId && (
                 <TouchableOpacity
@@ -183,9 +183,9 @@ export default function SettingsScreen() {
                   onPress={handleManageBilling}
                   disabled={portalLoading}
                 >
-                  <Text style={styles.manageBillingButtonText}>
+                  <AppText style={styles.manageBillingButtonText}>
                     {portalLoading ? 'Opening…' : 'Manage billing'}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               )}
               {canCancel && (
@@ -194,25 +194,25 @@ export default function SettingsScreen() {
                   onPress={handleCancelSubscription}
                   disabled={cancelling}
                 >
-                  <Text style={styles.cancelSubButtonText}>
+                  <AppText style={styles.cancelSubButtonText}>
                     {cancelling ? 'Cancelling…' : 'Cancel subscription'}
-                  </Text>
+                  </AppText>
                 </TouchableOpacity>
               )}
               {subscription.cancelAtPeriodEnd && (
-                <Text style={styles.cancelNote}>
+                <AppText style={styles.cancelNote}>
                   You cancelled your subscription. You can keep using the app until the date above.
-                </Text>
+                </AppText>
               )}
             </>
           ) : (
-            <Text style={styles.muted}>No subscription found.</Text>
+            <AppText style={styles.muted}>No subscription found.</AppText>
           )}
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Business details</Text>
-          <Text style={styles.hint}>Edit your current business name and address.</Text>
+          <AppText style={styles.sectionTitle}>Business details</AppText>
+          <AppText style={styles.hint}>Edit your current business name and address.</AppText>
           {currentBusiness ? (
             <>
               <TextInput
@@ -236,16 +236,16 @@ export default function SettingsScreen() {
                 onPress={handleSaveBusiness}
                 disabled={saving}
               >
-                <Text style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save business details'}</Text>
+                <AppText style={styles.saveButtonText}>{saving ? 'Saving…' : 'Save business details'}</AppText>
               </TouchableOpacity>
             </>
           ) : (
-            <Text style={styles.muted}>Add a business from Home → Switch business.</Text>
+            <AppText style={styles.muted}>Add a business from Home → Switch business.</AppText>
           )}
         </View>
 
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Log out</Text>
+          <AppText style={styles.logoutButtonText}>Log out</AppText>
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>

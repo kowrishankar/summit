@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   FlatList,
   TouchableOpacity,
@@ -9,6 +8,7 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import type { Category } from '../types';
 
@@ -65,27 +65,27 @@ export default function CategoriesScreen() {
         renderItem={({ item }) => (
           <View style={styles.row}>
             <View style={[styles.colorDot, { backgroundColor: item.color ?? '#6366f1' }]} />
-            <Text style={styles.name}>{item.name}</Text>
+            <AppText style={styles.name}>{item.name}</AppText>
             <View style={styles.actions}>
               <TouchableOpacity onPress={() => handleEdit(item)}>
-                <Text style={styles.actionText}>Edit</Text>
+                <AppText style={styles.actionText}>Edit</AppText>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => handleDelete(item)}>
-                <Text style={[styles.actionText, styles.deleteText]}>Delete</Text>
+                <AppText style={[styles.actionText, styles.deleteText]}>Delete</AppText>
               </TouchableOpacity>
             </View>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>No categories. Create one below.</Text>}
+        ListEmptyComponent={<AppText style={styles.empty}>No categories. Create one below.</AppText>}
       />
       <TouchableOpacity style={styles.fab} onPress={() => setModalVisible(true)}>
-        <Text style={styles.fabText}>+ New category</Text>
+        <AppText style={styles.fabText}>+ New category</AppText>
       </TouchableOpacity>
 
       <Modal visible={modalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>New category</Text>
+            <AppText style={styles.modalTitle}>New category</AppText>
             <TextInput
               style={styles.input}
               placeholder="Category name"
@@ -95,10 +95,10 @@ export default function CategoriesScreen() {
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setModalVisible(false)}>
-                <Text style={styles.modalBtnText}>Cancel</Text>
+                <AppText style={styles.modalBtnText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={handleAdd}>
-                <Text style={styles.modalBtnTextPrimary}>Add</Text>
+                <AppText style={styles.modalBtnTextPrimary}>Add</AppText>
               </TouchableOpacity>
             </View>
           </View>
@@ -108,7 +108,7 @@ export default function CategoriesScreen() {
       <Modal visible={editModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modal}>
-            <Text style={styles.modalTitle}>Edit category</Text>
+            <AppText style={styles.modalTitle}>Edit category</AppText>
             <TextInput
               style={styles.input}
               placeholder="Category name"
@@ -118,10 +118,10 @@ export default function CategoriesScreen() {
             />
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalBtn} onPress={() => setEditModalVisible(false)}>
-                <Text style={styles.modalBtnText}>Cancel</Text>
+                <AppText style={styles.modalBtnText}>Cancel</AppText>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={handleSaveEdit}>
-                <Text style={styles.modalBtnTextPrimary}>Save</Text>
+                <AppText style={styles.modalBtnTextPrimary}>Save</AppText>
               </TouchableOpacity>
             </View>
           </View>

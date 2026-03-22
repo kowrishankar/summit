@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, StyleSheet, FlatList } from 'react-native';
+import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import { formatAmount } from '../utils/currency';
 
@@ -27,15 +28,15 @@ export default function VendorsScreen() {
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <View style={styles.row}>
-            <Text style={styles.name} numberOfLines={1}>
+            <AppText style={styles.name} numberOfLines={1}>
               {item.name}
-            </Text>
-            <Text style={styles.meta}>
+            </AppText>
+            <AppText style={styles.meta}>
               {item.count} invoice{item.count !== 1 ? 's' : ''} · {formatAmount(item.total, 'GBP')}
-            </Text>
+            </AppText>
           </View>
         )}
-        ListEmptyComponent={<Text style={styles.empty}>No vendors yet. Add invoices first.</Text>}
+        ListEmptyComponent={<AppText style={styles.empty}>No vendors yet. Add invoices first.</AppText>}
       />
     </View>
   );

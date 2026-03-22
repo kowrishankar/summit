@@ -1,7 +1,6 @@
 import React, { useState, useRef } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -11,6 +10,7 @@ import {
   Image,
   useWindowDimensions,
 } from 'react-native';
+import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import ImageView from 'react-native-image-viewing';
@@ -342,22 +342,22 @@ export default function AddInvoiceScreen({
     return (
       <View style={[styles.container, { paddingBottom: insets.bottom }]}>
         <ScrollView style={styles.chooseScroll} contentContainerStyle={[styles.chooseContent, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
-          <Text style={styles.title}>Add invoice</Text>
-          <Text style={styles.subtitle}>
+          <AppText style={styles.title}>Add invoice</AppText>
+          <AppText style={styles.subtitle}>
             Take or upload a picture, or upload a PDF. The app will use GPT to extract
             merchant, amount, date, line items, and tax as JSON.
-          </Text>
+          </AppText>
           <TouchableOpacity style={styles.option} onPress={takePhoto}>
-            <Text style={styles.optionText}>Take photo</Text>
-            <Text style={styles.optionSub}>Capture the invoice; add more sections for long receipts</Text>
+            <AppText style={styles.optionText}>Take photo</AppText>
+            <AppText style={styles.optionSub}>Capture the invoice; add more sections for long receipts</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.option} onPress={pickImage}>
-            <Text style={styles.optionText}>Upload image</Text>
-            <Text style={styles.optionSub}>Choose a photo or scan from your device</Text>
+            <AppText style={styles.optionText}>Upload image</AppText>
+            <AppText style={styles.optionSub}>Choose a photo or scan from your device</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.option} onPress={pickDocument}>
-            <Text style={styles.optionText}>Upload file</Text>
-            <Text style={styles.optionSub}>PDF invoice file</Text>
+            <AppText style={styles.optionText}>Upload file</AppText>
+            <AppText style={styles.optionSub}>PDF invoice file</AppText>
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -378,14 +378,14 @@ export default function AddInvoiceScreen({
     const previewImageSource = previewSections.map((a) => ({ uri: a.uri }));
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.previewContent}>
-        <Text style={styles.title}>Confirm your file</Text>
-        <Text style={styles.previewSubtitle}>
+        <AppText style={styles.title}>Confirm your file</AppText>
+        <AppText style={styles.previewSubtitle}>
           {previewSections.length > 1
             ? 'Scroll down to see all parts of the receipt, then confirm or add another section.'
             : 'Review the image or document below, then confirm or choose another.'}
-        </Text>
+        </AppText>
         {!isPdf && sectionCount > 1 && (
-          <Text style={styles.sectionCountLabel}>{sectionCount} sections — scroll down to see next part</Text>
+          <AppText style={styles.sectionCountLabel}>{sectionCount} sections — scroll down to see next part</AppText>
         )}
         {!isPdf && previewSections.length > 0 ? (
           <View style={styles.previewSectionsContainer}>
@@ -400,12 +400,12 @@ export default function AddInvoiceScreen({
                 activeOpacity={1}
               >
                 {previewSections.length > 1 && (
-                  <Text style={styles.previewSectionLabel}>Part {index + 1} of {previewSections.length}</Text>
+                  <AppText style={styles.previewSectionLabel}>Part {index + 1} of {previewSections.length}</AppText>
                 )}
                 <Image source={{ uri: section.uri }} style={styles.previewSectionImage} resizeMode="contain" />
               </TouchableOpacity>
             ))}
-            <Text style={styles.previewZoomHintInline}>Tap any part to zoom and view</Text>
+            <AppText style={styles.previewZoomHintInline}>Tap any part to zoom and view</AppText>
           </View>
         ) : isPdf && documentUri ? (
           <View style={styles.previewBox}>
@@ -418,28 +418,28 @@ export default function AddInvoiceScreen({
                 scrollEnabled={true}
               />
             </View>
-            <Text style={styles.pdfFileNamePreview}>{fileName}</Text>
+            <AppText style={styles.pdfFileNamePreview}>{fileName}</AppText>
           </View>
         ) : isPdf ? (
           <View style={styles.previewBox}>
             <View style={styles.pdfPlaceholder}>
-              <Text style={styles.pdfPlaceholderText}>PDF document</Text>
-              <Text style={styles.pdfFileName}>{fileName}</Text>
+              <AppText style={styles.pdfPlaceholderText}>PDF document</AppText>
+              <AppText style={styles.pdfFileName}>{fileName}</AppText>
             </View>
           </View>
         ) : null}
         {!isPdf && (
           <TouchableOpacity style={styles.addSectionBtn} onPress={addAnotherSection}>
-            <Text style={styles.addSectionBtnText}>+ Add another section</Text>
-            <Text style={styles.addSectionBtnSub}>For long receipts, capture the next part in order</Text>
+            <AppText style={styles.addSectionBtnText}>+ Add another section</AppText>
+            <AppText style={styles.addSectionBtnSub}>For long receipts, capture the next part in order</AppText>
           </TouchableOpacity>
         )}
         <View style={styles.previewActions}>
           <TouchableOpacity style={styles.confirmBtn} onPress={confirmAndExtract}>
-            <Text style={styles.confirmBtnText}>Confirm & extract</Text>
+            <AppText style={styles.confirmBtnText}>Confirm & extract</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.selectAnotherBtn} onPress={selectAnother}>
-            <Text style={styles.selectAnotherBtnText}>Select another</Text>
+            <AppText style={styles.selectAnotherBtnText}>Select another</AppText>
           </TouchableOpacity>
         </View>
         {previewImageSource.length > 0 && (
@@ -460,7 +460,7 @@ export default function AddInvoiceScreen({
     return (
       <View style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#6366f1" />
-        <Text style={styles.extractingText}>Analysing invoice…</Text>
+        <AppText style={styles.extractingText}>Analysing invoice…</AppText>
       </View>
     );
   }
@@ -468,14 +468,14 @@ export default function AddInvoiceScreen({
   if (step === 'review' && extracted) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.reviewContent}>
-        <Text style={styles.title}>Review extracted data</Text>
-        <Text style={styles.reviewSubtitle}>View the uploaded document and extracted details</Text>
+        <AppText style={styles.title}>Review extracted data</AppText>
+        <AppText style={styles.reviewSubtitle}>View the uploaded document and extracted details</AppText>
         {documentUri && (
           <View style={styles.docPreview}>
             {isPdf ? (
               <View style={styles.pdfPlaceholder}>
-                <Text style={styles.pdfPlaceholderText}>PDF document</Text>
-                <Text style={styles.pdfFileName}>{fileName}</Text>
+                <AppText style={styles.pdfPlaceholderText}>PDF document</AppText>
+                <AppText style={styles.pdfFileName}>{fileName}</AppText>
               </View>
             ) : (
               <Image source={{ uri: documentUri }} style={styles.docImage} resizeMode="contain" />
@@ -483,18 +483,18 @@ export default function AddInvoiceScreen({
           </View>
         )}
         <View style={styles.reviewSummary}>
-          <Text style={styles.reviewMerchant}>{extracted.merchantName ?? '—'}</Text>
-          <Text style={styles.reviewAmount}>{formatAmount(extracted.amount ?? 0, extracted.currency)}</Text>
-          <Text style={styles.reviewMeta}>
+          <AppText style={styles.reviewMerchant}>{extracted.merchantName ?? '—'}</AppText>
+          <AppText style={styles.reviewAmount}>{formatAmount(extracted.amount ?? 0, extracted.currency)}</AppText>
+          <AppText style={styles.reviewMeta}>
             {extracted.date ? new Date(extracted.date).toLocaleDateString() : '—'} · {extracted.category ?? 'Uncategorised'}
-          </Text>
+          </AppText>
         </View>
         <View style={styles.reviewActions}>
           <TouchableOpacity style={styles.acceptBtn} onPress={acceptAndSave}>
-            <Text style={styles.acceptBtnText}>Accept & save</Text>
+            <AppText style={styles.acceptBtnText}>Accept & save</AppText>
           </TouchableOpacity>
           <TouchableOpacity style={styles.modifyBtn} onPress={() => setStep('edit')}>
-            <Text style={styles.modifyBtnText}>Modify</Text>
+            <AppText style={styles.modifyBtnText}>Modify</AppText>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -504,14 +504,14 @@ export default function AddInvoiceScreen({
   if ((step === 'edit' || step === 'saving') && extracted) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.editContent}>
-        <Text style={styles.title}>Modify & save</Text>
+        <AppText style={styles.title}>Modify & save</AppText>
         {documentUri && !isPdf && (
           <View style={styles.docPreviewSmall}>
             <Image source={{ uri: documentUri }} style={styles.docImageSmall} resizeMode="contain" />
           </View>
         )}
         {documentUri && isPdf && (
-          <Text style={styles.docLabel}>Document: {fileName}</Text>
+          <AppText style={styles.docLabel}>Document: {fileName}</AppText>
         )}
         <TextInput
           style={styles.input}
@@ -542,13 +542,13 @@ export default function AddInvoiceScreen({
           onChangeText={(t) => updateField('date', t)}
           placeholderTextColor="#64748b"
         />
-        <Text style={styles.label}>Category</Text>
+        <AppText style={styles.label}>Category</AppText>
         <View style={styles.chipRow}>
           <TouchableOpacity
             style={[styles.chip, !categoryId && styles.chipActive]}
             onPress={() => setCategoryId(null)}
           >
-            <Text style={[styles.chipText, !categoryId && styles.chipTextActive]}>None</Text>
+            <AppText style={[styles.chipText, !categoryId && styles.chipTextActive]}>None</AppText>
           </TouchableOpacity>
           {categories.map((c) => (
             <TouchableOpacity
@@ -556,7 +556,7 @@ export default function AddInvoiceScreen({
               style={[styles.chip, categoryId === c.id && styles.chipActive]}
               onPress={() => setCategoryId(categoryId === c.id ? null : c.id)}
             >
-              <Text style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>{c.name}</Text>
+              <AppText style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>{c.name}</AppText>
             </TouchableOpacity>
           ))}
         </View>
@@ -564,7 +564,7 @@ export default function AddInvoiceScreen({
           {step === 'saving' ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <Text style={styles.saveBtnText}>Save invoice</Text>
+            <AppText style={styles.saveBtnText}>Save invoice</AppText>
           )}
         </TouchableOpacity>
       </ScrollView>
