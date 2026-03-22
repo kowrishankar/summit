@@ -200,6 +200,80 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          {/* Business */}
+          <View style={styles.card}>
+            <AppText style={styles.cardTitle}>Business details</AppText>
+            <AppText style={styles.cardHint}>Edit your current business name and address.</AppText>
+            {currentBusiness ? (
+              <>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Business name"
+                  value={businessName}
+                  onChangeText={setBusinessName}
+                  placeholderTextColor={TEXT_MUTED}
+                />
+                <TextInput
+                  style={[styles.input, styles.inputMultiline]}
+                  placeholder="Business address"
+                  value={businessAddress}
+                  onChangeText={setBusinessAddress}
+                  placeholderTextColor={TEXT_MUTED}
+                  multiline
+                  numberOfLines={2}
+                />
+                <TouchableOpacity
+                  activeOpacity={0.92}
+                  onPress={handleSaveBusiness}
+                  disabled={saving}
+                  style={styles.gradientBtnTouchable}
+                >
+                  <LinearGradient
+                    colors={[PURPLE, PURPLE_DEEP]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.gradientBtn}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                    <AppText style={styles.gradientBtnText}>
+                      {saving ? 'Saving…' : 'Save business details'}
+                    </AppText>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <AppText style={styles.muted}>Add a business from Home → Switch business.</AppText>
+            )}
+          </View>
+
+          {Platform.OS !== 'web' && (
+            <View style={styles.card}>
+              <AppText style={styles.cardTitle}>Photos</AppText>
+              <View style={styles.preferenceShell}>
+                <View style={styles.iconTileBlue}>
+                  <Ionicons name="images-outline" size={22} color="#2563eb" />
+                </View>
+                <View style={styles.preferenceTextCol}>
+                  <AppText style={styles.preferenceTitle}>Save to gallery</AppText>
+                  <AppText style={styles.preferenceHint}>
+                    When you take a picture while adding an invoice or sale, also save a copy to your photo
+                    library.
+                  </AppText>
+                </View>
+                <Switch
+                  style={styles.preferenceSwitch}
+                  value={saveCameraToGallery}
+                  onValueChange={(v) => {
+                    setSaveCameraToGallery(v);
+                    void setSaveCameraPhotosToGallery(v);
+                  }}
+                  trackColor={{ false: '#cbd5e1', true: LAVENDER_SOFT }}
+                  thumbColor={saveCameraToGallery ? PURPLE : '#f4f4f5'}
+                />
+              </View>
+            </View>
+          )}
+          
           {/* Subscription */}
           <View style={styles.card}>
             <AppText style={styles.cardTitle}>Subscription</AppText>
@@ -275,80 +349,6 @@ export default function SettingsScreen() {
               <AppText style={styles.muted}>No subscription found.</AppText>
             )}
           </View>
-
-          {/* Business */}
-          <View style={styles.card}>
-            <AppText style={styles.cardTitle}>Business details</AppText>
-            <AppText style={styles.cardHint}>Edit your current business name and address.</AppText>
-            {currentBusiness ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Business name"
-                  value={businessName}
-                  onChangeText={setBusinessName}
-                  placeholderTextColor={TEXT_MUTED}
-                />
-                <TextInput
-                  style={[styles.input, styles.inputMultiline]}
-                  placeholder="Business address"
-                  value={businessAddress}
-                  onChangeText={setBusinessAddress}
-                  placeholderTextColor={TEXT_MUTED}
-                  multiline
-                  numberOfLines={2}
-                />
-                <TouchableOpacity
-                  activeOpacity={0.92}
-                  onPress={handleSaveBusiness}
-                  disabled={saving}
-                  style={styles.gradientBtnTouchable}
-                >
-                  <LinearGradient
-                    colors={[PURPLE, PURPLE_DEEP]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gradientBtn}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
-                    <AppText style={styles.gradientBtnText}>
-                      {saving ? 'Saving…' : 'Save business details'}
-                    </AppText>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <AppText style={styles.muted}>Add a business from Home → Switch business.</AppText>
-            )}
-          </View>
-
-          {Platform.OS !== 'web' && (
-            <View style={styles.card}>
-              <AppText style={styles.cardTitle}>Photos</AppText>
-              <View style={styles.preferenceShell}>
-                <View style={styles.iconTileBlue}>
-                  <Ionicons name="images-outline" size={22} color="#2563eb" />
-                </View>
-                <View style={styles.preferenceTextCol}>
-                  <AppText style={styles.preferenceTitle}>Save to gallery</AppText>
-                  <AppText style={styles.preferenceHint}>
-                    When you take a picture while adding an invoice or sale, also save a copy to your photo
-                    library.
-                  </AppText>
-                </View>
-                <Switch
-                  style={styles.preferenceSwitch}
-                  value={saveCameraToGallery}
-                  onValueChange={(v) => {
-                    setSaveCameraToGallery(v);
-                    void setSaveCameraPhotosToGallery(v);
-                  }}
-                  trackColor={{ false: '#cbd5e1', true: LAVENDER_SOFT }}
-                  thumbColor={saveCameraToGallery ? PURPLE : '#f4f4f5'}
-                />
-              </View>
-            </View>
-          )}
 
           <TouchableOpacity
             style={styles.logoutCard}

@@ -28,7 +28,7 @@ function RootNavigator() {
     if (user) return;
     (async () => {
       const seen = await AsyncStorage.getItem(ONBOARDING_SEEN_KEY);
-      setOnboardingSeen(seen === 'true');
+      setOnboardingSeen(seen === 'false'); // TODO: set it to true
     })();
   }, [user]);
 

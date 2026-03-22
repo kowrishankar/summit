@@ -28,15 +28,28 @@ import DashboardScreen from '../screens/DashboardScreen';
 import {
   BORDER,
   CARD_BG,
+  MUTED_CARD,
   PAGE_BG,
   PRIMARY,
-  PURPLE,
   TEXT,
+  TEXT_MUTED,
   headerScreenOptions,
 } from '../theme/design';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+/** Floating tab bar — slate icons + center FAB (design reference) */
+const NAV_ICON_INACTIVE = '#94a3b8';
+const NAV_ICON_ACTIVE = '#1e293b';
+const NAV_FAB_BG = '#475569';
+const TAB_BAR_PILL_RADIUS = 36;
+
+/** Popup rows — same pastel language as Home quick actions */
+const POPUP_DOC_TILE_BG = '#F5F3FF';
+const POPUP_DOC_ICON = '#4338CA';
+const POPUP_SALE_TILE_BG = '#ECFDF5';
+const POPUP_SALE_ICON = '#059669';
 
 const tabScreenOptions = {
   headerStyle: { backgroundColor: PAGE_BG },
@@ -107,37 +120,66 @@ function RecordsTabBarPopup({
   onClose,
   onSelectInvoices,
   onSelectSales,
+  bottomOffset,
 }: {
   visible: boolean;
   onClose: () => void;
   onSelectInvoices: () => void;
   onSelectSales: () => void;
+  bottomOffset: number;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
       <Pressable style={popupStyles.backdrop} onPress={onClose}>
-        <View style={popupStyles.popup} onStartShouldSetResponder={() => true}>
+        <View
+          style={[popupStyles.sheet, { marginBottom: bottomOffset }]}
+          onStartShouldSetResponder={() => true}
+        >
+          <View style={popupStyles.sheetHandle} />
+          <AppText style={popupStyles.sheetTitle}>Records</AppText>
+          <AppText style={popupStyles.sheetSubtitle}>Choose where to go</AppText>
+
           <Pressable
-            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
-            android_ripple={{ color: 'rgba(99, 102, 241, 0.2)' }}
+            style={({ pressed }) => [
+              popupStyles.optionCard,
+              pressed && popupStyles.optionCardPressed,
+            ]}
+            android_ripple={{ color: 'rgba(15, 23, 42, 0.06)' }}
             onPress={() => {
               onSelectInvoices();
               onClose();
             }}
           >
-            <Ionicons name="document-text-outline" size={20} color={PURPLE} />
-            <AppText style={popupStyles.optionText}>Invoices</AppText>
+            <View style={[popupStyles.iconBlob, { backgroundColor: POPUP_DOC_TILE_BG }]}>
+              <Ionicons name="document-text-outline" size={24} color={POPUP_DOC_ICON} />
+            </View>
+            <View style={popupStyles.optionTextCol}>
+              <AppText style={popupStyles.optionTitle}>Invoices</AppText>
+              <AppText style={popupStyles.optionDesc}>Receipts & expenses</AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
           </Pressable>
+
           <Pressable
-            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
-            android_ripple={{ color: 'rgba(34, 197, 94, 0.22)' }}
+            style={({ pressed }) => [
+              popupStyles.optionCard,
+              popupStyles.optionCardLast,
+              pressed && popupStyles.optionCardPressed,
+            ]}
+            android_ripple={{ color: 'rgba(15, 23, 42, 0.06)' }}
             onPress={() => {
               onSelectSales();
               onClose();
             }}
           >
-            <Ionicons name="trending-up-outline" size={20} color="#22c55e" />
-            <AppText style={popupStyles.optionText}>Sales</AppText>
+            <View style={[popupStyles.iconBlob, { backgroundColor: POPUP_SALE_TILE_BG }]}>
+              <Ionicons name="trending-up-outline" size={24} color={POPUP_SALE_ICON} />
+            </View>
+            <View style={popupStyles.optionTextCol}>
+              <AppText style={popupStyles.optionTitle}>Sales</AppText>
+              <AppText style={popupStyles.optionDesc}>Income & sales</AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
           </Pressable>
         </View>
       </Pressable>
@@ -150,37 +192,66 @@ function AddTabBarPopup({
   onClose,
   onSelectInvoice,
   onSelectSale,
+  bottomOffset,
 }: {
   visible: boolean;
   onClose: () => void;
   onSelectInvoice: () => void;
   onSelectSale: () => void;
+  bottomOffset: number;
 }) {
   return (
-    <Modal visible={visible} transparent animationType="fade">
+    <Modal visible={visible} transparent animationType="fade" statusBarTranslucent>
       <Pressable style={popupStyles.backdrop} onPress={onClose}>
-        <View style={popupStyles.popup} onStartShouldSetResponder={() => true}>
+        <View
+          style={[popupStyles.sheet, { marginBottom: bottomOffset }]}
+          onStartShouldSetResponder={() => true}
+        >
+          <View style={popupStyles.sheetHandle} />
+          <AppText style={popupStyles.sheetTitle}>Add</AppText>
+          <AppText style={popupStyles.sheetSubtitle}>Create something new</AppText>
+
           <Pressable
-            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
-            android_ripple={{ color: 'rgba(99, 102, 241, 0.2)' }}
+            style={({ pressed }) => [
+              popupStyles.optionCard,
+              pressed && popupStyles.optionCardPressed,
+            ]}
+            android_ripple={{ color: 'rgba(15, 23, 42, 0.06)' }}
             onPress={() => {
               onSelectInvoice();
               onClose();
             }}
           >
-            <Ionicons name="document-text-outline" size={20} color={PURPLE} />
-            <AppText style={popupStyles.optionText}>Add invoice</AppText>
+            <View style={[popupStyles.iconBlob, { backgroundColor: POPUP_DOC_TILE_BG }]}>
+              <Ionicons name="document-text-outline" size={24} color={POPUP_DOC_ICON} />
+            </View>
+            <View style={popupStyles.optionTextCol}>
+              <AppText style={popupStyles.optionTitle}>Add invoice</AppText>
+              <AppText style={popupStyles.optionDesc}>Scan or enter a receipt</AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
           </Pressable>
+
           <Pressable
-            style={({ pressed }) => [popupStyles.option, pressed && popupStyles.optionPressed]}
-            android_ripple={{ color: 'rgba(34, 197, 94, 0.22)' }}
+            style={({ pressed }) => [
+              popupStyles.optionCard,
+              popupStyles.optionCardLast,
+              pressed && popupStyles.optionCardPressed,
+            ]}
+            android_ripple={{ color: 'rgba(15, 23, 42, 0.06)' }}
             onPress={() => {
               onSelectSale();
               onClose();
             }}
           >
-            <Ionicons name="trending-up-outline" size={20} color="#22c55e" />
-            <AppText style={popupStyles.optionText}>Add sale</AppText>
+            <View style={[popupStyles.iconBlob, { backgroundColor: POPUP_SALE_TILE_BG }]}>
+              <Ionicons name="trending-up-outline" size={24} color={POPUP_SALE_ICON} />
+            </View>
+            <View style={popupStyles.optionTextCol}>
+              <AppText style={popupStyles.optionTitle}>Add sale</AppText>
+              <AppText style={popupStyles.optionDesc}>Record income or a sale</AppText>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
           </Pressable>
         </View>
       </Pressable>
@@ -192,46 +263,109 @@ const popupStyles = StyleSheet.create({
   backdrop: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(15, 23, 42, 0.45)',
   },
-  popup: {
+  sheet: {
+    marginHorizontal: 16,
     backgroundColor: CARD_BG,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    marginHorizontal: 12,
-    marginBottom: 70,
+    borderRadius: 28,
+    paddingTop: 10,
+    paddingHorizontal: 16,
+    paddingBottom: 18,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.28)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0f172a',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.18,
+        shadowRadius: 28,
+      },
+      android: { elevation: 14 },
+      default: {},
+    }),
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: BORDER,
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: TEXT,
+    marginBottom: 4,
+  },
+  sheetSubtitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    marginBottom: 16,
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: MUTED_CARD,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: BORDER,
   },
-  option: {
-    flexDirection: 'row',
+  optionCardLast: {
+    marginBottom: 0,
+  },
+  optionCardPressed: {
+    opacity: 0.92,
+  },
+  iconBlob: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
     alignItems: 'center',
-    gap: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    overflow: 'hidden',
+    justifyContent: 'center',
   },
-  optionPressed: {
-    backgroundColor: 'rgba(15, 23, 42, 0.06)',
+  optionTextCol: {
+    flex: 1,
+    marginLeft: 14,
+    marginRight: 8,
   },
-  optionText: {
+  optionTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: TEXT,
   },
+  optionDesc: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    marginTop: 3,
+    lineHeight: 18,
+  },
 });
+
+function tabIconName(
+  name: string,
+  focused: boolean
+): 'home' | 'home-outline' | 'folder' | 'folder-outline' | 'bar-chart' | 'bar-chart-outline' | 'settings' | 'settings-outline' | 'ellipse' {
+  if (name === 'Dashboard') return focused ? 'home' : 'home-outline';
+  if (name === RECORDS_TAB_NAME) return focused ? 'folder' : 'folder-outline';
+  if (name === 'Reports') return focused ? 'bar-chart' : 'bar-chart-outline';
+  if (name === 'Settings') return focused ? 'settings' : 'settings-outline';
+  return 'ellipse';
+}
 
 function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Navigator']>['tabBar']) {
   const [recordsPopupVisible, setRecordsPopupVisible] = useState(false);
   const [addPopupVisible, setAddPopupVisible] = useState(false);
   const insets = useSafeAreaInsets();
-  const { state, navigation, descriptors } = props as {
+  const { state, navigation } = props as {
     state: { index: number; routeNames: string[] };
     navigation: { navigate: (name: string, params?: { screen: string }) => void };
-    descriptors: Record<string, { options: { tabBarButton?: (p: unknown) => React.ReactNode } }>;
   };
 
   const selectInvoices = () => {
@@ -248,103 +382,170 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
     navigation.navigate('Add', { screen: 'AddSaleRoot' });
   };
 
+  const bottomPad = Math.max(12, insets.bottom);
+  /** Clear floating tab pill + safe area so sheets sit just above the bar */
+  const popupBottomOffset = Math.max(96, bottomPad + 76);
+
   return (
     <>
-      <View style={[tabBarStyles.tabBarContainer, { paddingBottom: Math.max(8, insets.bottom) }]}>
-        {state.routeNames.map((name, index) => {
-          const isRecords = name === RECORDS_TAB_NAME;
-          const isAdd = name === 'Add';
-          const isFocused = state.index === index;
-          const label =
-            name === 'Dashboard'
-              ? 'Home'
-              : name === RECORDS_TAB_NAME
-                ? 'View records'
-                : name === 'Add'
-                  ? 'Add'
-                  : name;
-          const iconName =
-            name === 'Dashboard'
-              ? 'home'
-              : name === RECORDS_TAB_NAME
-                ? 'folder-open'
-                : name === 'Add'
-                  ? 'add-circle'
-                  : name === 'Reports'
-                    ? 'bar-chart'
-                    : name === 'Settings'
-                      ? 'settings'
-                      : 'ellipse';
-          const color = isFocused ? PURPLE : '#64748b';
+      <View style={[tabBarStyles.tabBarOuter, { paddingBottom: bottomPad }]}>
+        <View style={tabBarStyles.tabBarPill}>
+          {state.routeNames.map((name, index) => {
+            const isRecords = name === RECORDS_TAB_NAME;
+            const isAdd = name === 'Add';
+            const isFocused = state.index === index;
+            const label =
+              name === 'Dashboard'
+                ? 'Home'
+                : name === RECORDS_TAB_NAME
+                  ? 'Records'
+                  : name === 'Add'
+                    ? ''
+                    : name;
+            const iconColor = isFocused ? NAV_ICON_ACTIVE : NAV_ICON_INACTIVE;
 
-          return (
-            <Pressable
-              key={name}
-              accessibilityRole="button"
-              accessibilityState={{ selected: isFocused }}
-              accessibilityLabel={label}
-              hitSlop={8}
-              style={({ pressed }) => [
-                tabBarStyles.tab,
-                (Platform.OS === 'ios' || Platform.OS === 'web') && pressed && tabBarStyles.tabPressed,
-              ]}
-              android_ripple={{ color: 'rgba(99, 102, 241, 0.22)', foreground: true }}
-              onPress={() => {
-                if (isRecords) {
-                  setRecordsPopupVisible(true);
-                } else if (isAdd) {
-                  setAddPopupVisible(true);
-                } else {
-                  navigation.navigate(name);
-                }
-              }}
-            >
-              <Ionicons name={iconName as 'home'} size={name === 'Add' ? 28 : 24} color={color} />
-              <AppText style={[tabBarStyles.label, { color }]}>{label}</AppText>
-            </Pressable>
-          );
-        })}
+            if (isAdd) {
+              return (
+                <Pressable
+                  key={name}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: isFocused }}
+                  accessibilityLabel="Add"
+                  style={({ pressed }) => [
+                    tabBarStyles.tabFabSlot,
+                    pressed && tabBarStyles.tabFabSlotPressed,
+                  ]}
+                  android_ripple={{ color: 'rgba(71, 85, 105, 0.2)', borderless: true }}
+                  onPress={() => setAddPopupVisible(true)}
+                >
+                  <View style={tabBarStyles.fabCircle}>
+                    <Ionicons name="add" size={30} color="#ffffff" />
+                  </View>
+                </Pressable>
+              );
+            }
+
+            const iconName = tabIconName(name, isFocused);
+
+            return (
+              <Pressable
+                key={name}
+                accessibilityRole="button"
+                accessibilityState={{ selected: isFocused }}
+                accessibilityLabel={label || name}
+                style={({ pressed }) => [
+                  tabBarStyles.tab,
+                  (Platform.OS === 'ios' || Platform.OS === 'web') && pressed && tabBarStyles.tabPressed,
+                ]}
+                android_ripple={{ color: 'rgba(30, 41, 59, 0.08)', foreground: true }}
+                onPress={() => {
+                  if (isRecords) {
+                    setRecordsPopupVisible(true);
+                  } else {
+                    navigation.navigate(name);
+                  }
+                }}
+              >
+                <Ionicons name={iconName} size={22} color={iconColor} />
+                <AppText style={[tabBarStyles.label, { color: iconColor }]} numberOfLines={1}>
+                  {label}
+                </AppText>
+              </Pressable>
+            );
+          })}
+        </View>
       </View>
       <RecordsTabBarPopup
         visible={recordsPopupVisible}
         onClose={() => setRecordsPopupVisible(false)}
         onSelectInvoices={selectInvoices}
         onSelectSales={selectSales}
+        bottomOffset={popupBottomOffset}
       />
       <AddTabBarPopup
         visible={addPopupVisible}
         onClose={() => setAddPopupVisible(false)}
         onSelectInvoice={selectAddInvoice}
         onSelectSale={selectAddSale}
+        bottomOffset={popupBottomOffset}
       />
     </>
   );
 }
 
 const tabBarStyles = StyleSheet.create({
-  tabBarContainer: {
+  tabBarOuter: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    backgroundColor: PAGE_BG,
+  },
+  tabBarPill: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: CARD_BG,
-    borderTopColor: BORDER,
-    borderTopWidth: 1,
-    paddingBottom: 24,
-    paddingTop: 8,
+    borderRadius: TAB_BAR_PILL_RADIUS,
+    paddingVertical: 10,
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.25)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0f172a',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.12,
+        shadowRadius: 24,
+      },
+      android: {
+        elevation: 10,
+      },
+      default: {},
+    }),
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 6,
-    marginHorizontal: 2,
-    borderRadius: 12,
-    overflow: 'hidden',
+    paddingVertical: 4,
+    minHeight: 52,
   },
   tabPressed: {
-    backgroundColor: 'rgba(123, 97, 255, 0.12)',
+    opacity: 0.85,
+  },
+  tabFabSlot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 52,
+  },
+  tabFabSlotPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.97 }],
+  },
+  fabCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: NAV_FAB_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -6,
+    marginBottom: -2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0f172a',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+      },
+      android: { elevation: 6 },
+      default: {},
+    }),
   },
   label: {
-    fontSize: 11,
+    fontSize: 10,
+    fontWeight: '600',
     marginTop: 4,
+    letterSpacing: 0.2,
   },
 });
 
