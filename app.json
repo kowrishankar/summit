@@ -21,7 +21,7 @@
         },
         "NSCameraUsageDescription": "Summit uses the camera to capture invoices and sales documents.",
         "NSPhotoLibraryUsageDescription": "Summit uses your photo library to attach invoice and sale images.",
-        "NSPhotoLibraryAddUsageDescription": "Summit can save exported images to your library when you choose to.",
+        "NSPhotoLibraryAddUsageDescription": "Summit saves photos you take for invoices or sales to your library when Save to gallery is on in Settings.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -41,6 +41,14 @@
     },
     "plugins": [
       ["@stripe/stripe-react-native", {}],
+      [
+        "expo-media-library",
+        {
+          "photosPermission": "Summit uses your photo library to attach invoice and sale images.",
+          "savePhotosPermission": "Summit saves photos you take to your gallery when you enable Save to gallery in Settings.",
+          "isAccessMediaLocationEnabled": false
+        }
+      ],
       "./plugins/removeInAppPaymentsEntitlement.js"
     ],
     "extra": {

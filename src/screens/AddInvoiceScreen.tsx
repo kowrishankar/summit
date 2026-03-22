@@ -24,6 +24,7 @@ import { extractFromText, extractFromImageBase64, extractFromMultipleImagesBase6
 import { uploadAttachments } from '../services/attachmentStorage';
 import { renderPdfFirstPageToImageBase64 } from '../services/pdfText';
 import { formatAmount } from '../utils/currency';
+import { maybeSaveCameraImageToGallery } from '../utils/saveCameraImageToGallery';
 import type { ExtractedInvoiceData } from '../types';
 
 export default function AddInvoiceScreen({
@@ -82,6 +83,7 @@ export default function AddInvoiceScreen({
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    void maybeSaveCameraImageToGallery(asset.uri);
     const item = asset.uri ? { uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? undefined } : null;
     setFileName(asset.fileName ?? 'photo.jpg');
     setDocumentUri(asset.uri ?? null);
@@ -106,6 +108,7 @@ export default function AddInvoiceScreen({
     });
     if (result.canceled || !result.assets[0]) return;
     const asset = result.assets[0];
+    void maybeSaveCameraImageToGallery(asset.uri);
     const item = asset.uri ? { uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? undefined } : null;
     if (item) {
       const next = [...pendingImageAssetsRef.current, item];

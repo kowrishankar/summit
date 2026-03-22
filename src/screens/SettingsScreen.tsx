@@ -10,6 +10,7 @@ import {
   Platform,
   ActivityIndicator,
   Linking,
+  Switch,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,6 +21,10 @@ import {
   formatPrice,
 } from '../services/subscription';
 import { createPortalSession } from '../services/stripeApi';
+import {
+  getSaveCameraPhotosToGallery,
+  setSaveCameraPhotosToGallery,
+} from '../services/cameraGalleryPreference';
 import type { Subscription } from '../types';
 
 export default function SettingsScreen() {
@@ -32,6 +37,7 @@ export default function SettingsScreen() {
   const [subLoading, setSubLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [saveCameraToGallery, setSaveCameraToGallery] = useState(false);
 
   const loadSubscription = useCallback(async () => {
     if (!user?.id) return;
@@ -47,6 +53,11 @@ export default function SettingsScreen() {
   useEffect(() => {
     loadSubscription();
   }, [loadSubscription]);
+
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    void getSaveCameraPhotosToGallery().then(setSaveCameraToGallery);
+  }, []);
 
   useEffect(() => {
     if (currentBusiness) {
@@ -250,6 +261,30 @@ export default function SettingsScreen() {
           )}
         </View>
 
+        {Platform.OS !== 'web' && (
+          <View style={styles.section}>
+            <AppText style={styles.sectionTitle}>Photos</AppText>
+            <View style={styles.preferenceRow}>
+              <View style={styles.preferenceTextCol}>
+                <AppText style={styles.preferenceTitle}>Save to gallery</AppText>
+                <AppText style={styles.preferenceHint}>
+                  When you take a picture while adding an invoice or sale, also save a copy to your photo library.
+                </AppText>
+              </View>
+              <Switch
+                style={styles.preferenceSwitch}
+                value={saveCameraToGallery}
+                onValueChange={(v) => {
+                  setSaveCameraToGallery(v);
+                  void setSaveCameraPhotosToGallery(v);
+                }}
+                trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
+                thumbColor={saveCameraToGallery ? '#6366f1' : '#f4f4f5'}
+              />
+            </View>
+          </View>
+        )}
+
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
           <AppText style={styles.logoutButtonText}>Log out</AppText>
         </TouchableOpacity>
@@ -315,4 +350,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutButtonText: { color: '#ef4444', fontSize: 16, fontWeight: '600' },
+  preferenceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  preferenceTextCol: { flex: 1 },
+  preferenceTitle: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 4 },
+  preferenceHint: { fontSize: 13, color: '#64748b', lineHeight: 18 },
+  preferenceSwitch: { marginLeft: 12 },
 });
