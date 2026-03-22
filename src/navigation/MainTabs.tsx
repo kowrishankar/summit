@@ -24,6 +24,7 @@ import AddSaleScreen from '../screens/AddSaleScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import EditInvoiceScreen from '../screens/EditInvoiceScreen';
 import BusinessSwitchScreen from '../screens/BusinessSwitchScreen';
+import DashboardScreen from '../screens/DashboardScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -39,7 +40,12 @@ const tabScreenOptions = {
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a' }}>
-      <Stack.Screen name="HomeMain" component={HomeScreen} options={{ title: 'Dashboard' }} />
+      <Stack.Screen name="HomeMain" component={HomeScreen} options={{ title: 'Home' }} />
+      <Stack.Screen
+        name="Dashboard"
+        component={DashboardScreen}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="BusinessSwitch" component={BusinessSwitchScreen} options={{ title: 'Switch business' }} />
     </Stack.Navigator>
   );
@@ -368,6 +374,7 @@ export default function MainTabs() {
         name="Reports"
         component={ReportsScreen}
         options={{
+          headerShown: false,
           tabBarLabel: 'Reports',
           tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
         }}

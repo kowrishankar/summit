@@ -1,54 +1,59 @@
-import React, { useMemo, useState } from 'react';
-import { View, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useMemo } from 'react';
+import {
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Text,
+  Alert,
+  Platform,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
+import { format, getWeek, parseISO, isValid, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useAddPreferred } from '../contexts/AddPreferredContext';
 import { formatAmount } from '../utils/currency';
-import { startOfWeek, startOfMonth, startOfYear, endOfWeek, endOfMonth, subWeeks, subMonths, subYears } from 'date-fns';
 
-const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function formatHelloName(email: string | undefined): string {
+  if (!email) return 'there';
+  const local = email.split('@')[0] ?? 'User';
+  return local
+    .split('.')
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+    .join('.');
+}
+
+type ActivityKind = 'invoice' | 'sale';
+
+interface ActivityRow {
+  kind: ActivityKind;
+  id: string;
+  dateRaw: string;
+  title: string;
+  subtitle: string;
+  dateLine: string;
+  amount: number;
+  currency?: string;
+  categoryLabel: string;
+  verified: boolean;
+}
 
 export default function HomeScreen({
   navigation,
 }: {
-  navigation: { navigate: (s: string) => void; getParent?: () => { navigate: (s: string) => void } | undefined };
+  navigation: {
+    navigate: (s: string, p?: object) => void;
+    getParent?: () => { navigate: (s: string, p?: object) => void } | undefined;
+  };
 }) {
+  const insets = useSafeAreaInsets();
   const { spendSummary, invoices, sales, currentBusiness, categories } = useApp();
   const { user } = useAuth();
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(currentYear);
-
-  const availableYears = useMemo(() => {
-    let minYear = currentYear;
-    [...invoices, ...sales].forEach((item) => {
-      const y = item.extracted.date?.slice(0, 4);
-      if (y) {
-        const n = parseInt(y, 10);
-        if (n < minYear) minYear = n;
-      }
-    });
-    const list: number[] = [];
-    for (let y = currentYear; y >= minYear; y--) list.push(y);
-    return list;
-  }, [invoices, sales, currentYear]);
-
-  const invoicesForYear = useMemo(
-    () =>
-      invoices.filter((inv) => {
-        const d = inv.extracted.date;
-        return d && d.slice(0, 4) === String(selectedYear);
-      }),
-    [invoices, selectedYear]
-  );
-
-  const salesForYear = useMemo(
-    () =>
-      sales.filter((s) => {
-        const d = s.extracted.date;
-        return d && d.slice(0, 4) === String(selectedYear);
-      }),
-    [sales, selectedYear]
-  );
+  const { setPreferredAddType } = useAddPreferred();
 
   const primaryCurrency = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -62,20 +67,8 @@ export default function HomeScreen({
 
   const formatCurrency = (n: number) => formatAmount(n, primaryCurrency);
 
-  const isCurrentYear = selectedYear === currentYear;
-
-  const yearSummary = useMemo(() => {
-    let spend = 0;
-    let tax = 0;
-    invoicesForYear.forEach((inv) => {
-      spend += inv.extracted.amount ?? 0;
-      tax += inv.extracted.vatAmount ?? 0;
-    });
-    return { spend, tax, count: invoicesForYear.length };
-  }, [invoicesForYear]);
-
   const incomeSummary = useMemo(() => {
-    const weekStartStr = startOfWeek(new Date()).toISOString().slice(0, 10);
+    const weekStartStr = startOfWeek(new Date(), { weekStartsOn: 1 }).toISOString().slice(0, 10);
     const monthStartStr = startOfMonth(new Date()).toISOString().slice(0, 10);
     const yearStartStr = startOfYear(new Date()).toISOString().slice(0, 10);
     let week = 0;
@@ -84,689 +77,516 @@ export default function HomeScreen({
     sales.forEach((s) => {
       const d = s.extracted.date;
       const amt = s.extracted.amount ?? 0;
-      if (d >= weekStartStr) week += amt;
-      if (d >= monthStartStr) month += amt;
-      if (d >= yearStartStr) year += amt;
+      if (d && d >= weekStartStr) week += amt;
+      if (d && d >= monthStartStr) month += amt;
+      if (d && d >= yearStartStr) year += amt;
     });
     return { week, month, year };
   }, [sales]);
 
-  const previousPeriodSums = useMemo(() => {
-    const now = new Date();
-    const lastWeekStart = startOfWeek(subWeeks(now, 1));
-    const lastWeekEnd = endOfWeek(subWeeks(now, 1));
-    const lastWeekStartStr = lastWeekStart.toISOString().slice(0, 10);
-    const lastWeekEndStr = lastWeekEnd.toISOString().slice(0, 10);
-    const lastMonthStart = startOfMonth(subMonths(now, 1));
-    const lastMonthEnd = endOfMonth(subMonths(now, 1));
-    const lastMonthStartStr = lastMonthStart.toISOString().slice(0, 10);
-    const lastMonthEndStr = lastMonthEnd.toISOString().slice(0, 10);
-    const lastYearStart = startOfYear(subYears(now, 1));
-    const lastYearEnd = subYears(now, 1);
-    const lastYearStartStr = lastYearStart.toISOString().slice(0, 10);
-    const lastYearEndStr = lastYearEnd.toISOString().slice(0, 10);
+  const netMonth = useMemo(
+    () => incomeSummary.month - spendSummary.month,
+    [incomeSummary.month, spendSummary.month]
+  );
 
-    let lastWeekSpend = 0;
-    let lastWeekIncome = 0;
-    let lastMonthSpend = 0;
-    let lastMonthIncome = 0;
-    let lastYearSpend = 0;
-    let lastYearIncome = 0;
+  /** Expense share of money movement this month (for progress bar). */
+  const expenseBarPct = useMemo(() => {
+    const spend = spendSummary.month;
+    const income = incomeSummary.month;
+    const t = spend + income;
+    if (t <= 0) return spend > 0 ? 100 : 0;
+    return Math.min(100, Math.round((spend / t) * 100));
+  }, [spendSummary.month, incomeSummary.month]);
+
+  const categoryName = (categoryId: string | null, fallback?: string) => {
+    if (!categoryId) return fallback?.trim() || 'Uncategorised';
+    const c = categories.find((x) => x.id === categoryId);
+    return c?.name ?? fallback?.trim() ?? 'Uncategorised';
+  };
+
+  const recentActivity = useMemo((): ActivityRow[] => {
+    const rows: ActivityRow[] = [];
 
     invoices.forEach((inv) => {
       const d = inv.extracted.date;
-      const amt = inv.extracted.amount ?? 0;
-      if (d && d >= lastWeekStartStr && d <= lastWeekEndStr) lastWeekSpend += amt;
-      if (d && d >= lastMonthStartStr && d <= lastMonthEndStr) lastMonthSpend += amt;
-      if (d && d >= lastYearStartStr && d <= lastYearEndStr) lastYearSpend += amt;
+      if (!d) return;
+      const cat = categoryName(inv.categoryId, inv.extracted.category);
+      const merchant = inv.extracted.merchantName?.trim() ?? '';
+      const pay = inv.extracted.paymentType?.trim();
+      const title =
+        cat !== 'Uncategorised'
+          ? pay
+            ? `${cat} (${pay})`
+            : cat
+          : `${merchant || 'Expense'} (Uncategorised)`;
+      const subtitle = merchant ? `${merchant} · ${currentBusiness?.name ?? ''}`.replace(/ · $/, '') : currentBusiness?.name || '—';
+      let dateLine = d;
+      try {
+        const parsed = parseISO(d.length >= 10 ? d.slice(0, 10) : d);
+        if (isValid(parsed)) {
+          const w = getWeek(parsed, { weekStartsOn: 1 });
+          dateLine = `${format(parsed, 'd MMMM yyyy')}, W${w}`;
+        }
+      } catch {
+        /* keep raw */
+      }
+      rows.push({
+        kind: 'invoice',
+        id: inv.id,
+        dateRaw: d,
+        title,
+        subtitle,
+        dateLine,
+        amount: inv.extracted.amount ?? 0,
+        currency: inv.extracted.currency,
+        categoryLabel: cat,
+        verified: Boolean(merchant),
+      });
     });
+
     sales.forEach((s) => {
       const d = s.extracted.date;
-      const amt = s.extracted.amount ?? 0;
-      if (d && d >= lastWeekStartStr && d <= lastWeekEndStr) lastWeekIncome += amt;
-      if (d && d >= lastMonthStartStr && d <= lastMonthEndStr) lastMonthIncome += amt;
-      if (d && d >= lastYearStartStr && d <= lastYearEndStr) lastYearIncome += amt;
+      if (!d) return;
+      const cat = categoryName(s.categoryId, s.extracted.category);
+      const merchant = s.extracted.merchantName?.trim() ?? s.extracted.ownedBy?.trim() ?? '';
+      const pay = s.extracted.paymentType?.trim();
+      const title =
+        cat !== 'Uncategorised'
+          ? pay
+            ? `${cat} (${pay})`
+            : cat
+          : `${merchant || 'Sale'} (Uncategorised)`;
+      const subtitle = merchant ? `${merchant} · ${currentBusiness?.name ?? ''}`.replace(/ · $/, '') : currentBusiness?.name || '—';
+      let dateLine = d;
+      try {
+        const parsed = parseISO(d.length >= 10 ? d.slice(0, 10) : d);
+        if (isValid(parsed)) {
+          const w = getWeek(parsed, { weekStartsOn: 1 });
+          dateLine = `${format(parsed, 'd MMMM yyyy')}, W${w}`;
+        }
+      } catch {
+        /* keep raw */
+      }
+      rows.push({
+        kind: 'sale',
+        id: s.id,
+        dateRaw: d,
+        title,
+        subtitle,
+        dateLine,
+        amount: s.extracted.amount ?? 0,
+        currency: s.extracted.currency,
+        categoryLabel: cat,
+        verified: Boolean(merchant),
+      });
     });
 
-    return {
-      lastWeek: { spend: lastWeekSpend, income: lastWeekIncome },
-      lastMonth: { spend: lastMonthSpend, income: lastMonthIncome },
-      lastYearYTD: { spend: lastYearSpend, income: lastYearIncome },
-    };
-  }, [invoices, sales]);
+    rows.sort((a, b) => (a.dateRaw < b.dateRaw ? 1 : a.dateRaw > b.dateRaw ? -1 : 0));
+    return rows.slice(0, 8);
+  }, [invoices, sales, categories, currentBusiness?.name]);
 
-  const pctChange = (current: number, previous: number): number | null =>
-    previous === 0 ? null : Math.round(((current - previous) / previous) * 100);
+  const parentNav = () => navigation.getParent?.();
 
-  const yearIncomeSummary = useMemo(() => {
-    let income = 0;
-    salesForYear.forEach((s) => {
-      income += s.extracted.amount ?? 0;
-    });
-    return { income, count: salesForYear.length };
-  }, [salesForYear]);
+  const goAddInvoice = () => {
+    setPreferredAddType('invoice');
+    parentNav()?.navigate('Add', { screen: 'AddInvoiceRoot' });
+  };
 
-  const monthStart = startOfMonth(new Date(selectedYear, isCurrentYear ? new Date().getMonth() : 0, 1));
-  const monthEnd = endOfMonth(monthStart);
-  const monthStartStr = monthStart.toISOString().slice(0, 10);
-  const monthEndStr = monthEnd.toISOString().slice(0, 10);
+  const goAddSale = () => {
+    setPreferredAddType('sale');
+    parentNav()?.navigate('Add', { screen: 'AddSaleRoot' });
+  };
 
-  const weeklySpend = useMemo(() => {
-    if (!isCurrentYear) return null;
-    const weeks: { label: string; total: number }[] = [
-      { label: 'W1', total: 0 },
-      { label: 'W2', total: 0 },
-      { label: 'W3', total: 0 },
-      { label: 'W4', total: 0 },
-      { label: 'W5', total: 0 },
-    ];
-    invoicesForYear.forEach((inv) => {
-      const d = inv.extracted.date;
-      if (d < monthStartStr || d > monthEndStr) return;
-      const day = parseInt(d.slice(8, 10), 10);
-      const weekIndex = Math.min(Math.floor((day - 1) / 7), 4);
-      weeks[weekIndex].total += inv.extracted.amount ?? 0;
-    });
-    return weeks;
-  }, [invoicesForYear, monthStartStr, monthEndStr, isCurrentYear]);
+  const goRecords = () => parentNav()?.navigate('Records', { screen: 'InvoicesList' });
 
-  const monthlySpend = useMemo(() => {
-    const months = MONTH_LABELS.map((label, i) => ({ label, total: 0, month: i + 1 }));
-    const yearStr = String(selectedYear);
-    invoicesForYear.forEach((inv) => {
-      const d = inv.extracted.date;
-      if (!d || d.slice(0, 4) !== yearStr) return;
-      const monthNum = parseInt(d.slice(5, 7), 10);
-      if (monthNum >= 1 && monthNum <= 12) months[monthNum - 1].total += inv.extracted.amount ?? 0;
-    });
-    return months;
-  }, [invoicesForYear, selectedYear]);
-
-  const maxMonthSpend = useMemo(
-    () => Math.max(1, ...monthlySpend.map((m) => m.total)),
-    [monthlySpend]
-  );
-
-  const spendingByCategory = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; color?: string }>();
-    map.set('__uncategorized__', { name: 'Uncategorised', total: 0 });
-    categories.forEach((c) => map.set(c.id, { name: c.name, total: 0, color: c.color }));
-    invoicesForYear.forEach((inv) => {
-      const amt = inv.extracted.amount ?? 0;
-      const key = inv.categoryId ?? '__uncategorized__';
-      const entry = map.get(key);
-      if (entry) entry.total += amt;
-      else map.set(key, { name: 'Uncategorised', total: amt });
-    });
-    return Array.from(map.entries())
-      .map(([id, data]) => ({ id, ...data }))
-      .filter((c) => c.total > 0)
-      .sort((a, b) => b.total - a.total);
-  }, [invoicesForYear, categories]);
-
-  const incomeByCategory = useMemo(() => {
-    const map = new Map<string, { name: string; total: number; color?: string }>();
-    map.set('__uncategorized__', { name: 'Uncategorised', total: 0 });
-    categories.forEach((c) => map.set(c.id, { name: c.name, total: 0, color: c.color }));
-    salesForYear.forEach((s) => {
-      const amt = s.extracted.amount ?? 0;
-      const key = s.categoryId ?? '__uncategorized__';
-      const entry = map.get(key);
-      if (entry) entry.total += amt;
-      else map.set(key, { name: 'Uncategorised', total: amt });
-    });
-    return Array.from(map.entries())
-      .map(([id, data]) => ({ id, ...data }))
-      .filter((c) => c.total > 0)
-      .sort((a, b) => b.total - a.total);
-  }, [salesForYear, categories]);
-
-  const totalForCategories = useMemo(
-    () => spendingByCategory.reduce((s, c) => s + c.total, 0),
-    [spendingByCategory]
-  );
-
-  const totalForIncomeCategories = useMemo(
-    () => incomeByCategory.reduce((s, c) => s + c.total, 0),
-    [incomeByCategory]
-  );
-
-  const netCurrent = useMemo(() => {
-    if (!isCurrentYear) return null;
-    return {
-      week: incomeSummary.week - spendSummary.week,
-      month: incomeSummary.month - spendSummary.month,
-      year: incomeSummary.year - spendSummary.year,
-    };
-  }, [isCurrentYear, incomeSummary, spendSummary]);
-
-  const netYear = useMemo(() => {
-    return yearIncomeSummary.income - yearSummary.spend;
-  }, [yearIncomeSummary, yearSummary]);
-
-  const maxWeekSpend = useMemo(
-    () => (weeklySpend ? Math.max(1, ...weeklySpend.map((w) => w.total)) : 1),
-    [weeklySpend]
-  );
-
-  const renderChange = (
-    current: number,
-    previous: number,
-    inverse: boolean
-  ): { pct: number; isIncrease: boolean; good: boolean } | null => {
-    const pct = pctChange(current, previous);
-    if (pct === null) return null;
-    const isIncrease = pct > 0;
-    const good = inverse ? !isIncrease : isIncrease;
-    return { pct: Math.abs(pct), isIncrease, good };
+  const onActivityPress = (row: ActivityRow) => {
+    if (row.kind === 'invoice') {
+      parentNav()?.navigate('Records', { screen: 'InvoiceDetail', params: { invoiceId: row.id } });
+    } else {
+      parentNav()?.navigate('Records', { screen: 'SaleDetail', params: { saleId: row.id } });
+    }
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <View>
-            <AppText style={styles.greeting}>Hello, {user?.email?.split('@')[0] ?? 'User'}</AppText>
-            <AppText style={styles.business}>{currentBusiness?.name ?? 'No business'}</AppText>
-          </View>
-          <TouchableOpacity style={styles.switchBtn} onPress={() => navigation.navigate('BusinessSwitch')}>
-            <AppText style={styles.switchBtnText}>Switch</AppText>
-          </TouchableOpacity>
-        </View>
-
-        <AppText style={styles.sectionTitle}>Year</AppText>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.yearRow}
-        style={styles.yearScroll}
-      >
-        {availableYears.map((y) => (
-          <TouchableOpacity
-            key={y}
-            style={[styles.yearPill, selectedYear === y && styles.yearPillActive]}
-            onPress={() => setSelectedYear(y)}
-          >
-            <AppText style={[styles.yearPillText, selectedYear === y && styles.yearPillTextActive]}>{y}</AppText>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {isCurrentYear && (
-        <View style={styles.netBanner}>
-          <AppText style={styles.netBannerLabel}>Net balance</AppText>
-          <AppText
-            style={[
-              styles.netBannerValue,
-              netYear >= 0 ? styles.netBannerPositive : styles.netBannerNegative,
-            ]}
-          >
-            {formatCurrency(netYear)}
-          </AppText>
-        </View>
-      )}
-
-        <AppText style={styles.sectionTitle}>Expenses</AppText>
-        <View style={styles.cards}>
-          {isCurrentYear ? (
-            <>
-              <View style={styles.card}>
-                <AppText style={styles.cardLabel}>This week</AppText>
-                <AppText style={styles.cardValue}>{formatCurrency(spendSummary.week)}</AppText>
-                {(() => {
-                  const ch = renderChange(spendSummary.week, previousPeriodSums.lastWeek.spend, true);
-                  return ch ? (
-                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
-                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last week
-                    </AppText>
-                  ) : null;
-                })()}
-              </View>
-              <View style={styles.card}>
-                <AppText style={styles.cardLabel}>This month</AppText>
-                <AppText style={styles.cardValue}>{formatCurrency(spendSummary.month)}</AppText>
-                {(() => {
-                  const ch = renderChange(spendSummary.month, previousPeriodSums.lastMonth.spend, true);
-                  return ch ? (
-                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
-                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last month
-                    </AppText>
-                  ) : null;
-                })()}
-              </View>
-              <View style={styles.card}>
-                <AppText style={styles.cardLabel}>This year</AppText>
-                <AppText style={styles.cardValue}>{formatCurrency(spendSummary.year)}</AppText>
-                {(() => {
-                  const ch = renderChange(spendSummary.year, previousPeriodSums.lastYearYTD.spend, true);
-                  return ch ? (
-                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
-                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last year
-                    </AppText>
-                  ) : null;
-                })()}
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.card}>
-                <AppText style={styles.cardLabel}>{selectedYear} expenses</AppText>
-                <AppText style={styles.cardValue}>{formatCurrency(yearSummary.spend)}</AppText>
-              </View>
-              <View style={styles.card}>
-                <AppText style={styles.cardLabel}>Tax {selectedYear}</AppText>
-                <AppText style={styles.cardValue}>{formatCurrency(yearSummary.tax)}</AppText>
-              </View>
-              <View style={styles.card}>
-                <AppText style={styles.cardLabel}>Invoices</AppText>
-                <AppText style={styles.cardValue}>{yearSummary.count}</AppText>
-              </View>
-            </>
-          )}
-        </View>
-
-        <AppText style={styles.sectionTitle}>Income</AppText>
-        <View style={styles.cards}>
-          {isCurrentYear ? (
-            <>
-              <View style={styles.cardIncome}>
-                <AppText style={styles.cardLabel}>This week</AppText>
-                <AppText style={styles.cardValueIncome}>{formatCurrency(incomeSummary.week)}</AppText>
-                {(() => {
-                  const ch = renderChange(incomeSummary.week, previousPeriodSums.lastWeek.income, false);
-                  return ch ? (
-                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
-                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last week
-                    </AppText>
-                  ) : null;
-                })()}
-              </View>
-              <View style={styles.cardIncome}>
-                <AppText style={styles.cardLabel}>This month</AppText>
-                <AppText style={styles.cardValueIncome}>{formatCurrency(incomeSummary.month)}</AppText>
-                {(() => {
-                  const ch = renderChange(incomeSummary.month, previousPeriodSums.lastMonth.income, false);
-                  return ch ? (
-                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
-                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last month
-                    </AppText>
-                  ) : null;
-                })()}
-              </View>
-              <View style={styles.cardIncome}>
-                <AppText style={styles.cardLabel}>This year</AppText>
-                <AppText style={styles.cardValueIncome}>{formatCurrency(incomeSummary.year)}</AppText>
-                {(() => {
-                  const ch = renderChange(incomeSummary.year, previousPeriodSums.lastYearYTD.income, false);
-                  return ch ? (
-                    <AppText style={[styles.changeText, ch.good ? styles.changeUp : styles.changeDown]}>
-                      {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last year
-                    </AppText>
-                  ) : null;
-                })()}
-              </View>
-            </>
-          ) : (
-            <>
-              <View style={styles.cardIncome}>
-                <AppText style={styles.cardLabel}>{selectedYear} income</AppText>
-                <AppText style={styles.cardValueIncome}>{formatCurrency(yearIncomeSummary.income)}</AppText>
-              </View>
-              <View style={styles.cardIncome}>
-                <AppText style={styles.cardLabel}>Sales</AppText>
-                <AppText style={styles.cardValueIncome}>{yearIncomeSummary.count}</AppText>
-              </View>
-            </>
-          )}
-        </View>
-
-        <AppText style={styles.sectionTitle}>Net</AppText>
-        <View style={styles.netCard}>
-          {isCurrentYear && netCurrent ? (
-            <>
-              <View style={styles.netRow}>
-                <AppText style={styles.netLabel}>This week</AppText>
-                <View>
-                  <AppText style={[styles.netValue, netCurrent.week >= 0 ? styles.netPositive : styles.netNegative]}>
-                    {formatCurrency(netCurrent.week)}
-                  </AppText>
-                  {(() => {
-                    const prev = previousPeriodSums.lastWeek.income - previousPeriodSums.lastWeek.spend;
-                    const ch = renderChange(netCurrent.week, prev, false);
-                    return ch ? (
-                      <AppText style={[styles.changeTextSmall, ch.good ? styles.changeUp : styles.changeDown]}>
-                        {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last week
-                      </AppText>
-                    ) : null;
-                  })()}
-                </View>
-              </View>
-              <View style={styles.netDivider} />
-              <View style={styles.netRow}>
-                <AppText style={styles.netLabel}>This month</AppText>
-                <View>
-                  <AppText style={[styles.netValue, netCurrent.month >= 0 ? styles.netPositive : styles.netNegative]}>
-                    {formatCurrency(netCurrent.month)}
-                  </AppText>
-                  {(() => {
-                    const prev = previousPeriodSums.lastMonth.income - previousPeriodSums.lastMonth.spend;
-                    const ch = renderChange(netCurrent.month, prev, false);
-                    return ch ? (
-                      <AppText style={[styles.changeTextSmall, ch.good ? styles.changeUp : styles.changeDown]}>
-                        {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last month
-                      </AppText>
-                    ) : null;
-                  })()}
-                </View>
-              </View>
-              <View style={styles.netDivider} />
-              <View style={styles.netRow}>
-                <AppText style={styles.netLabel}>This year</AppText>
-                <View>
-                  <AppText style={[styles.netValue, netCurrent.year >= 0 ? styles.netPositive : styles.netNegative]}>
-                    {formatCurrency(netCurrent.year)}
-                  </AppText>
-                  {(() => {
-                    const prev = previousPeriodSums.lastYearYTD.income - previousPeriodSums.lastYearYTD.spend;
-                    const ch = renderChange(netCurrent.year, prev, false);
-                    return ch ? (
-                      <AppText style={[styles.changeTextSmall, ch.good ? styles.changeUp : styles.changeDown]}>
-                        {ch.isIncrease ? '↑' : '↓'} {ch.pct}% vs last year
-                      </AppText>
-                    ) : null;
-                  })()}
-                </View>
-              </View>
-            </>
-          ) : (
-            <View style={styles.netRow}>
-              <AppText style={styles.netLabel}>{selectedYear} net</AppText>
-              <AppText style={[styles.netValue, netYear >= 0 ? styles.netPositive : styles.netNegative]}>
-                {formatCurrency(netYear)}
-              </AppText>
-            </View>
-          )}
-        </View>
-
-        <AppText style={styles.sectionTitle}>Tax paid</AppText>
-        <View style={styles.taxRow}>
-          {isCurrentYear ? (
-            <>
-              <View style={styles.taxItem}>
-                <AppText style={styles.taxLabel}>Week</AppText>
-                <AppText style={styles.taxValue}>{formatCurrency(spendSummary.taxWeek)}</AppText>
-              </View>
-              <View style={styles.taxDivider} />
-              <View style={styles.taxItem}>
-                <AppText style={styles.taxLabel}>Month</AppText>
-                <AppText style={styles.taxValue}>{formatCurrency(spendSummary.taxMonth)}</AppText>
-              </View>
-              <View style={styles.taxDivider} />
-              <View style={styles.taxItem}>
-                <AppText style={styles.taxLabel}>Year</AppText>
-                <AppText style={styles.taxValue}>{formatCurrency(spendSummary.taxYear)}</AppText>
-              </View>
-            </>
-          ) : (
-            <View style={styles.taxItem}>
-              <AppText style={styles.taxLabel}>{selectedYear} tax</AppText>
-              <AppText style={styles.taxValue}>{formatCurrency(yearSummary.tax)}</AppText>
-            </View>
-          )}
-        </View>
-
-        {isCurrentYear && weeklySpend ? (
-          <>
-            <AppText style={styles.sectionTitle}>Spending this month</AppText>
-            <View style={styles.chart}>
-            {weeklySpend.map((w, i) => {
-              const barHeightPct = maxWeekSpend > 0 ? w.total / maxWeekSpend : 0;
-              const barHeight = Math.max(4, Math.round(barHeightPct * 100));
-              return (
-                <View key={i} style={styles.chartBarWrap}>
-                  <View style={styles.chartBarOuter}>
-                    <View style={[styles.chartBar, { height: `${barHeight}%` }]} />
-                  </View>
-                  <AppText style={styles.chartBarLabel} numberOfLines={1}>{formatCurrency(w.total)}</AppText>
-                  <AppText style={styles.chartBarWeek}>{w.label}</AppText>
-                </View>
-              );
-            })}
-          </View>
-            <AppText style={styles.chartHint}>Week 1–7 · 8–14 · 15–21 · 22–28 · 29–31</AppText>
-          </>
-        ) : (
-          <>
-            <AppText style={styles.sectionTitle}>Spending by month · {selectedYear}</AppText>
-            <View style={styles.chart}>
-            {monthlySpend.map((m, i) => {
-              const barHeightPct = maxMonthSpend > 0 ? m.total / maxMonthSpend : 0;
-              const barHeight = Math.max(4, Math.round(barHeightPct * 100));
-              return (
-                <View key={i} style={styles.chartBarWrap}>
-                  <View style={styles.chartBarOuter}>
-                    <View style={[styles.chartBar, { height: `${barHeight}%` }]} />
-                  </View>
-                  <AppText style={styles.chartBarLabel} numberOfLines={1}>{formatCurrency(m.total)}</AppText>
-                  <AppText style={styles.chartBarWeek}>{m.label}</AppText>
-                </View>
-              );
-            })}
-            </View>
-          </>
-        )}
-
-        <AppText style={styles.sectionTitle}>Expenses by category {!isCurrentYear && `· ${selectedYear}`}</AppText>
-        {spendingByCategory.length === 0 ? (
-          <AppText style={styles.empty}>No expenses in {selectedYear}.</AppText>
-        ) : (
-          <View style={styles.categoryList}>
-          {spendingByCategory.map((cat) => {
-            const pct = totalForCategories > 0 ? (cat.total / totalForCategories) * 100 : 0;
-            return (
-              <View key={`exp-${cat.id}`} style={styles.categoryRow}>
-                <View style={styles.categoryRowTop}>
-                  <View style={[styles.categoryDot, cat.color ? { backgroundColor: cat.color } : null]} />
-                  <AppText style={styles.categoryName}>{cat.name}</AppText>
-                  <AppText style={styles.categoryAmount}>{formatCurrency(cat.total)}</AppText>
-                </View>
-                <View style={styles.categoryBarBg}>
-                  <View
-                    style={[
-                      styles.categoryBarFill,
-                      { width: `${pct}%` },
-                      cat.color ? { backgroundColor: cat.color } : null,
-                    ]}
-                  />
-                </View>
-              </View>
-            );
-          })}
-          </View>
-        )}
-
-        <AppText style={styles.sectionTitle}>Income by category {!isCurrentYear && `· ${selectedYear}`}</AppText>
-        {incomeByCategory.length === 0 ? (
-          <AppText style={styles.empty}>No income in {selectedYear}.</AppText>
-        ) : (
-          <View style={styles.categoryList}>
-          {incomeByCategory.map((cat) => {
-            const pct = totalForIncomeCategories > 0 ? (cat.total / totalForIncomeCategories) * 100 : 0;
-            return (
-              <View key={`inc-${cat.id}`} style={styles.categoryRow}>
-                <View style={styles.categoryRowTop}>
-                  <View style={[styles.categoryDotIncome, cat.color ? { backgroundColor: cat.color } : null]} />
-                  <AppText style={styles.categoryName}>{cat.name}</AppText>
-                  <AppText style={styles.categoryAmountIncome}>{formatCurrency(cat.total)}</AppText>
-                </View>
-                <View style={styles.categoryBarBg}>
-                  <View
-                    style={[
-                      styles.categoryBarFillIncome,
-                      { width: `${pct}%` },
-                      cat.color ? { backgroundColor: cat.color } : null,
-                    ]}
-                  />
-                </View>
-              </View>
-            );
-          })}
-          </View>
-        )}
-
-        <AppText style={styles.sectionTitle}>Quick access</AppText>
-        <View style={styles.quickRow}>
-          <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Records', { screen: 'InvoicesList' })}>
-            <AppText style={styles.quickNumber}>{invoices.length}</AppText>
-            <AppText style={styles.quickLabel}>Invoices</AppText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Records', { screen: 'SalesList' })}>
-            <AppText style={styles.quickNumberIncome}>{sales.length}</AppText>
-            <AppText style={styles.quickLabel}>Sales</AppText>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.quickCard} onPress={() => navigation.getParent?.()?.navigate('Reports')}>
-            <AppText style={styles.quickLabel}>Reports</AppText>
-          </TouchableOpacity>
-        </View>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={[
+        styles.scrollContent,
+        { paddingTop: Math.max(16, insets.top + 8), paddingBottom: 100 },
+      ]}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* Header */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity
+          style={styles.headerTextWrap}
+          onPress={() => navigation.navigate('BusinessSwitch')}
+          activeOpacity={0.7}
+        >
+          <AppText style={styles.helloName}>Hello, {formatHelloName(user?.email)}</AppText>
+          <AppText style={styles.businessSub}>{currentBusiness?.name ?? 'No business'}</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.giftBtn}
+          onPress={() => Alert.alert('Summit', 'Rewards and tips are coming soon.')}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="gift-outline" size={22} color="#4F46E5" />
+        </TouchableOpacity>
       </View>
+
+      {/* Total balance card */}
+      <TouchableOpacity
+        style={styles.balanceCard}
+        onPress={() => navigation.navigate('Dashboard')}
+        activeOpacity={0.92}
+      >
+        <View style={styles.balanceRow}>
+          <LinearGradient colors={['#EDE7F6', '#E8E0F5']} style={styles.balanceIconCircle}>
+            <Ionicons name="wallet-outline" size={28} color="#5B4FC9" />
+          </LinearGradient>
+          <View style={styles.balanceCenter}>
+            <Text style={styles.balanceLabel}>TOTAL BALANCE</Text>
+            <Text style={[styles.balanceAmount, netMonth < 0 ? styles.balanceNegative : styles.balancePositive]}>
+              {formatCurrency(netMonth)}
+            </Text>
+            <Text style={styles.balanceHint}>This month · net (income − expenses)</Text>
+            <View style={styles.progressTrack}>
+              <LinearGradient
+                colors={['#F5C6CB', '#CE93D8']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={[styles.progressFill, { width: `${expenseBarPct}%` }]}
+              />
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={22} color="#B2BEC3" />
+        </View>
+      </TouchableOpacity>
+
+      {/* Quick actions */}
+      <AppText style={styles.sectionHeading}>Quick Actions</AppText>
+      <View style={styles.quickActionsRow}>
+        <TouchableOpacity style={styles.quickActionCell} onPress={goAddInvoice} activeOpacity={0.85}>
+          <View style={[styles.quickActionIconWrap, styles.quickScan]}>
+            <Ionicons name="scan-outline" size={28} color="#3949AB" />
+          </View>
+          <AppText style={styles.quickActionLabel}>Scan Receipt</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickActionCell} onPress={goAddInvoice} activeOpacity={0.85}>
+          <View style={[styles.quickActionIconWrap, styles.quickExpense]}>
+            <View style={styles.orangeCircle}>
+              <Ionicons name="add" size={26} color="#FFFFFF" />
+            </View>
+          </View>
+          <AppText style={styles.quickActionLabel}>Add Expense</AppText>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickActionCell} onPress={goAddSale} activeOpacity={0.85}>
+          <View style={[styles.quickActionIconWrap, styles.quickSale]}>
+            <View style={styles.tealCircle}>
+              <Ionicons name="cart-outline" size={24} color="#FFFFFF" />
+            </View>
+          </View>
+          <AppText style={styles.quickActionLabel}>Add Sale</AppText>
+        </TouchableOpacity>
+      </View>
+
+      {/* Recent activity */}
+      <View style={styles.activityHeaderRow}>
+        <AppText style={styles.sectionHeading}>Recent Activity</AppText>
+        <TouchableOpacity onPress={goRecords} hitSlop={12}>
+          <AppText style={styles.viewAll}>View All</AppText>
+        </TouchableOpacity>
+      </View>
+
+      {recentActivity.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <AppText style={styles.emptyText}>No activity yet. Add an invoice or sale to get started.</AppText>
+        </View>
+      ) : (
+        recentActivity.map((row) => (
+          <TouchableOpacity
+            key={`${row.kind}-${row.id}`}
+            style={styles.activityCard}
+            onPress={() => onActivityPress(row)}
+            activeOpacity={0.9}
+          >
+            <View style={styles.activityLeft}>
+              <View style={styles.activityTitleRow}>
+                <AppText style={styles.activityTitle} numberOfLines={2}>
+                  {row.title}
+                </AppText>
+                {row.verified ? (
+                  <Ionicons name="checkmark-circle" size={18} color="#22c55e" style={styles.verifiedCheck} />
+                ) : null}
+              </View>
+              <AppText style={styles.activitySubtitle} numberOfLines={1}>
+                {row.subtitle}
+              </AppText>
+              <AppText style={styles.activityDate}>{row.dateLine}</AppText>
+            </View>
+            <View style={styles.activityRight}>
+              <AppText style={[styles.activityAmount, row.kind === 'sale' ? styles.amountSale : styles.amountExpense]}>
+                {row.kind === 'sale' ? '+' : ''}
+                {formatAmount(row.amount, row.currency ?? primaryCurrency)}
+              </AppText>
+              <AppText style={styles.activityCategory}>{row.categoryLabel}</AppText>
+            </View>
+          </TouchableOpacity>
+        ))
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#ffffff' },
-  contentContainer: { paddingBottom: 100 },
-  content: { padding: 20 },
-  netBanner: {
-    width: '100%',
-    backgroundColor: '#f1f5f9',
-    paddingVertical: 20,
+  screen: {
+    flex: 1,
+    backgroundColor: '#F7F8FA',
+  },
+  scrollContent: {
     paddingHorizontal: 20,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  headerTextWrap: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  helloName: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#2D3436',
     marginBottom: 4,
+  },
+  businessSub: {
+    fontSize: 15,
+    color: '#636E72',
+  },
+  giftBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: '#E8EAF6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  balanceCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 28,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.07,
+        shadowRadius: 12,
+      },
+      android: { elevation: 3 },
+    }),
+  },
+  balanceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  balanceIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  balanceCenter: {
+    flex: 1,
+  },
+  balanceLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94a3b8',
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  balanceAmount: {
+    fontSize: 28,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  balanceNegative: {
+    color: '#B03A2E',
+  },
+  balancePositive: {
+    color: '#2E7D32',
+  },
+  balanceHint: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginBottom: 12,
+  },
+  progressTrack: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#ECEFF1',
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  sectionHeading: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#2D3436',
+    marginBottom: 14,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 28,
+  },
+  quickActionCell: {
+    flex: 1,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  quickActionIconWrap: {
+    width: '100%',
+    aspectRatio: 1,
+    maxWidth: 108,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  quickScan: {
+    backgroundColor: '#EDE7F6',
+  },
+  quickExpense: {
+    backgroundColor: '#FFF3E0',
+  },
+  quickSale: {
+    backgroundColor: '#E0F7FA',
+  },
+  orangeCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#FF9800',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  netBannerLabel: { fontSize: 14, fontWeight: '600', color: '#64748b', marginBottom: 4 },
-  netBannerValue: { fontSize: 28, fontWeight: '800' },
-  netBannerPositive: { color: '#22c55e' },
-  netBannerNegative: { color: '#ef4444' },
-  changeText: { fontSize: 11, marginTop: 4 },
-  changeTextSmall: { fontSize: 10, marginTop: 2 },
-  changeUp: { color: '#22c55e' },
-  changeDown: { color: '#ef4444' },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  tealCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#26A69A',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'center',
   },
-  greeting: { fontSize: 22, fontWeight: '700', color: '#0f172a' },
-  business: { fontSize: 14, color: '#94a3b8' },
-  switchBtn: { backgroundColor: '#f1f5f9', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 8 },
-  switchBtnText: { color: '#818cf8', fontWeight: '600' },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#334155', marginBottom: 12 },
-  yearScroll: { marginBottom: 16, maxHeight: 44 },
-  yearRow: { flexDirection: 'row', gap: 10, paddingVertical: 4 },
-  yearPill: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
+  quickActionLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#2D3436',
+    textAlign: 'center',
+  },
+  activityHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  viewAll: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#7C6FDB',
+  },
+  emptyCard: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    backgroundColor: '#f1f5f9',
-  },
-  yearPillActive: { backgroundColor: '#6366f1' },
-  yearPillText: { fontSize: 15, color: '#94a3b8', fontWeight: '600' },
-  yearPillTextActive: { color: '#fff' },
-  cards: { flexDirection: 'row', gap: 12, marginBottom: 20 },
-  card: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 16,
-  },
-  cardLabel: { fontSize: 12, color: '#94a3b8', marginBottom: 4 },
-  cardValue: { fontSize: 16, fontWeight: '700', color: '#0f172a' },
-  cardIncome: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 16,
-    borderLeftWidth: 3,
-    borderLeftColor: '#22c55e',
-  },
-  cardValueIncome: { fontSize: 16, fontWeight: '700', color: '#22c55e' },
-  netCard: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    flexDirection: 'row',
+    padding: 24,
     alignItems: 'center',
   },
-  netRow: { flex: 1, alignItems: 'center' },
-  netLabel: { fontSize: 11, color: '#94a3b8', marginBottom: 4 },
-  netValue: { fontSize: 15, fontWeight: '700' },
-  netPositive: { color: '#22c55e' },
-  netNegative: { color: '#ef4444' },
-  netDivider: { width: 1, height: 32, backgroundColor: '#334155' },
-  taxRow: {
-    flexDirection: 'row',
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
-    alignItems: 'center',
+  emptyText: {
+    fontSize: 14,
+    color: '#94a3b8',
+    textAlign: 'center',
+    lineHeight: 20,
   },
-  taxItem: { flex: 1, alignItems: 'center' },
-  taxLabel: { fontSize: 11, color: '#94a3b8', marginBottom: 4 },
-  taxValue: { fontSize: 14, fontWeight: '700', color: '#f59e0b' },
-  taxDivider: { width: 1, height: 28, backgroundColor: '#334155' },
-  chart: {
+  activityCard: {
     flexDirection: 'row',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 16,
+    marginBottom: 10,
+    alignItems: 'flex-start',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  activityLeft: {
+    flex: 1,
+    paddingRight: 12,
+  },
+  activityTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  activityTitle: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#2D3436',
+  },
+  verifiedCheck: {
+    marginLeft: 6,
+    marginTop: 1,
+  },
+  activitySubtitle: {
+    fontSize: 13,
+    color: '#636E72',
+    marginTop: 4,
+  },
+  activityDate: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 6,
+  },
+  activityRight: {
     alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    height: 140,
-    marginBottom: 4,
-    paddingHorizontal: 2,
-    overflow: 'hidden',
   },
-  chartBarWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end', marginHorizontal: 2 },
-  chartBarOuter: {
-    height: 88,
-    width: '85%',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
+  activityAmount: {
+    fontSize: 16,
+    fontWeight: '700',
   },
-  chartBar: {
-    width: '100%',
-    minHeight: 4,
-    backgroundColor: '#6366f1',
-    borderTopLeftRadius: 6,
-    borderTopRightRadius: 6,
+  amountExpense: {
+    color: '#2D3436',
   },
-  chartBarLabel: { fontSize: 9, color: '#94a3b8', marginTop: 4 },
-  chartBarWeek: { fontSize: 10, fontWeight: '600', color: '#64748b', marginTop: 2 },
-  chartHint: { fontSize: 11, color: '#475569', marginBottom: 24, textAlign: 'center' },
-  categoryList: { marginBottom: 24 },
-  categoryRow: { marginBottom: 14 },
-  categoryRowTop: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-  categoryDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#6366f1', marginRight: 8 },
-  categoryDotIncome: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#22c55e', marginRight: 8 },
-  categoryName: { flex: 1, fontSize: 14, color: '#334155' },
-  categoryAmount: { fontSize: 14, fontWeight: '600', color: '#0f172a' },
-  categoryAmountIncome: { fontSize: 14, fontWeight: '600', color: '#22c55e' },
-  categoryBarBg: { height: 6, backgroundColor: '#f1f5f9', borderRadius: 3, overflow: 'hidden' },
-  categoryBarFill: { height: '100%', backgroundColor: '#6366f1', borderRadius: 3 },
-  categoryBarFillIncome: { height: '100%', backgroundColor: '#22c55e', borderRadius: 3 },
-  empty: { fontSize: 14, color: '#64748b', marginBottom: 24 },
-  quickRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  quickCard: {
-    width: '30%',
-    minWidth: 100,
-    backgroundColor: '#f1f5f9',
-    borderRadius: 12,
-    padding: 20,
+  amountSale: {
+    color: '#2E7D32',
   },
-  quickNumber: { fontSize: 24, fontWeight: '700', color: '#6366f1' },
-  quickNumberIncome: { fontSize: 24, fontWeight: '700', color: '#22c55e' },
-  quickLabel: { fontSize: 14, color: '#94a3b8', marginTop: 4 },
+  activityCategory: {
+    fontSize: 11,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
 });
