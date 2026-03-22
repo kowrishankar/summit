@@ -82,8 +82,8 @@ export interface User {
   createdAt: string;
 }
 
-/** Subscription status: active, cancelling (access until period end), or cancelled (no access). */
-export type SubscriptionStatus = 'active' | 'cancel_at_period_end' | 'cancelled';
+/** Subscription status: trialing (free trial, card on file), active, cancelling, or cancelled (no access). */
+export type SubscriptionStatus = 'active' | 'trialing' | 'cancel_at_period_end' | 'cancelled';
 
 export interface Subscription {
   id: string;

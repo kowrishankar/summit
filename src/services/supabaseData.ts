@@ -255,8 +255,11 @@ export async function upsertSubscriptionFromStripe(
   userId: string,
   params: {
     currentPeriodEnd: string;
+    currentPeriodStart?: string;
     stripeSubscriptionId?: string;
     stripeCustomerId?: string;
+    /** Stripe `trialing` vs paid `active` */
+    status?: 'active' | 'trialing';
   }
 ): Promise<Subscription> {
   const now = new Date().toISOString();
@@ -266,13 +269,15 @@ export async function upsertSubscriptionFromStripe(
     .eq('user_id', userId)
     .maybeSingle();
 
+  const status = params.status ?? 'active';
+
   const row = {
     user_id: userId,
-    status: 'active',
+    status,
     amount_pence: MONTHLY_PRICE_PENCE,
     currency: CURRENCY,
     interval: 'month',
-    current_period_start: existing?.current_period_start ?? now,
+    current_period_start: params.currentPeriodStart ?? existing?.current_period_start ?? now,
     current_period_end: params.currentPeriodEnd,
     cancel_at_period_end: false,
     cancelled_at: null,

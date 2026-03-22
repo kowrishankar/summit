@@ -8,9 +8,14 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
+  Switch,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
+import { STRIPE_TRIAL_DAYS } from '../config/trial';
+
+const TRIAL_PREF_KEY = 'summit_subscribe_with_trial';
 
 export default function SignupScreen({ navigation }: { navigation: { navigate: (s: string) => void } }) {
   const { signup } = useAuth();
@@ -20,6 +25,7 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [loading, setLoading] = useState(false);
+  const [startWithTrial, setStartWithTrial] = useState(false);
 
   const handleSignup = async () => {
     if (!email.trim() || !password) {
@@ -41,7 +47,11 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
     setLoading(true);
     try {
       const result = await signup(email.trim(), password, businessName.trim(), businessAddress.trim());
-      if (!result.ok) Alert.alert('Error', result.error ?? 'Signup failed.');
+      if (!result.ok) {
+        Alert.alert('Error', result.error ?? 'Signup failed.');
+      } else {
+        await AsyncStorage.setItem(TRIAL_PREF_KEY, startWithTrial ? 'true' : 'false');
+      }
     } finally {
       setLoading(false);
     }
@@ -53,7 +63,6 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <AppText style={styles.title}>Create account</AppText>
-      <AppText style={styles.subtitle}>Sign up for Summit</AppText>
       <TextInput
         style={styles.input}
         placeholder="Email"
@@ -79,7 +88,9 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
         secureTextEntry
         autoComplete="new-password"
       />
-      <AppText style={styles.paymentHint}>Next step: add your payment method for £14.99/month.</AppText>
+      <AppText style={styles.paymentHint}>
+        
+      </AppText>
       <AppText style={styles.sectionLabel}>Business details</AppText>
       <TextInput
         style={styles.input}
@@ -133,10 +144,38 @@ const styles = StyleSheet.create({
   paymentHint: {
     fontSize: 13,
     color: '#64748b',
-    marginBottom: 16,
+    marginBottom: 12,
+  },
+  trialRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  trialTextCol: {
+    flex: 1,
+  },
+  trialTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  trialHint: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 17,
+  },
+  trialSwitch: {
+    marginLeft: 8,
   },
   input: {
-    backgroundColor: 'white',
+    backgroundColor: 'beige',
     borderRadius: 12,
     padding: 16,
     color: 'black',

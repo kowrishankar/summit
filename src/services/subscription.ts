@@ -1,4 +1,4 @@
-import type { Subscription, SubscriptionStatus } from '../types';
+import type { Subscription } from '../types';
 import * as supabaseData from './supabaseData';
 
 const MONTHLY_PRICE_PENCE = 1499;
@@ -12,7 +12,13 @@ export async function getSubscriptionForUser(userId: string): Promise<Subscripti
 /** Save subscription from Stripe after successful payment (used by Subscribe screen). */
 export async function createSubscriptionFromStripe(
   userId: string,
-  params: { currentPeriodEnd: string; stripeSubscriptionId?: string; stripeCustomerId?: string }
+  params: {
+    currentPeriodEnd: string;
+    currentPeriodStart?: string;
+    stripeSubscriptionId?: string;
+    stripeCustomerId?: string;
+    status?: 'active' | 'trialing';
+  }
 ): Promise<Subscription> {
   return supabaseData.upsertSubscriptionFromStripe(userId, params);
 }
@@ -28,7 +34,11 @@ export function hasActiveAccess(sub: Subscription | null): boolean {
   const now = new Date().getTime();
   const end = new Date(sub.currentPeriodEnd).getTime();
   if (now > end) return false;
-  return sub.status === 'active' || sub.status === 'cancel_at_period_end';
+  return (
+    sub.status === 'active' ||
+    sub.status === 'trialing' ||
+    sub.status === 'cancel_at_period_end'
+  );
 }
 
 /** Human-readable price e.g. "£14.99" */

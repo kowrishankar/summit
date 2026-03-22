@@ -110,7 +110,7 @@ export default function SettingsScreen() {
 
   const canCancel =
     subscription &&
-    subscription.status === 'active' &&
+    (subscription.status === 'active' || subscription.status === 'trialing') &&
     !subscription.cancelAtPeriodEnd;
 
   const handleManageBilling = async () => {
@@ -162,14 +162,20 @@ export default function SettingsScreen() {
                 <AppText style={styles.subValue}>
                   {subscription.status === 'active'
                     ? 'Active'
-                    : subscription.status === 'cancel_at_period_end'
-                      ? 'Cancelling at period end'
-                      : 'Ended'}
+                    : subscription.status === 'trialing'
+                      ? 'Free trial'
+                      : subscription.status === 'cancel_at_period_end'
+                        ? 'Cancelling at period end'
+                        : 'Ended'}
                 </AppText>
               </View>
               <View style={styles.subRow}>
                 <AppText style={styles.subLabel}>
-                  {subscription.cancelAtPeriodEnd ? 'Access until' : 'Next billing date'}
+                  {subscription.cancelAtPeriodEnd
+                    ? 'Access until'
+                    : subscription.status === 'trialing'
+                      ? 'First payment on'
+                      : 'Next billing date'}
                 </AppText>
                 <AppText style={styles.subValue}>
                   {new Date(subscription.currentPeriodEnd).toLocaleDateString(undefined, {

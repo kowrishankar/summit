@@ -68,7 +68,7 @@ CREATE TABLE sales (
 CREATE TABLE subscriptions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
-  status TEXT NOT NULL CHECK (status IN ('active', 'cancel_at_period_end', 'cancelled')),
+  status TEXT NOT NULL CHECK (status IN ('active', 'trialing', 'cancel_at_period_end', 'cancelled')),
   amount_pence INT NOT NULL,
   currency TEXT NOT NULL,
   interval TEXT NOT NULL,
@@ -132,6 +132,23 @@ CREATE POLICY "Users can manage own preferences"
 
 -- Storage bucket for invoice/sale attachments (optional; create in Dashboard if you use Storage)
 -- Storage → New bucket → name: attachments, public or private with RLS
+```
+
+### Already created `subscriptions` without `trialing`?
+
+If your table was created with an older schema, allow the **free trial** status in Postgres (run once in **SQL Editor**):
+
+```sql
+ALTER TABLE subscriptions DROP CONSTRAINT IF EXISTS subscriptions_status_check;
+ALTER TABLE subscriptions ADD CONSTRAINT subscriptions_status_check
+  CHECK (status IN ('active', 'trialing', 'cancel_at_period_end', 'cancelled'));
+```
+
+If the constraint has a different name, find it with:
+
+```sql
+SELECT conname FROM pg_constraint
+  WHERE conrelid = 'public.subscriptions'::regclass AND contype = 'c';
 ```
 
 ## 3. Storage bucket (for invoice/sale files)

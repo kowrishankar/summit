@@ -4,6 +4,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import StripeDeepLinkHandler from './src/components/StripeDeepLinkHandler';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { AppProvider } from './src/contexts/AppContext';
 import AuthStack from './src/navigation/AuthStack';
@@ -90,6 +91,7 @@ export default function App() {
       <SafeAreaProvider>
         {stripeEnabled ? (
           <StripeProvider publishableKey={publishableKey}>
+            <StripeDeepLinkHandler />
             <AppNavigation />
           </StripeProvider>
         ) : (

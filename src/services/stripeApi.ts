@@ -90,10 +90,57 @@ export async function createSubscription(customerId: string): Promise<{
   return postJson('/create-subscription', { customerId });
 }
 
+/** Single PaymentSheet: first invoice PaymentIntent (card + first charge + 3DS if needed). */
+export async function prepareSubscriptionPayment(email: string): Promise<{
+  subscriptionId: string;
+  customerId: string;
+  status: string;
+  clientSecret?: string;
+  currentPeriodEnd?: string;
+  currentPeriodStart?: string;
+  stripeMode?: 'test' | 'live';
+}> {
+  const data = await postJson<{
+    subscriptionId: string;
+    customerId: string;
+    status: string;
+    clientSecret?: string;
+    currentPeriodEnd?: string;
+    currentPeriodStart?: string;
+    stripeMode?: 'test' | 'live';
+  }>('/prepare-subscription-payment', { email });
+  assertPublishableKeyMatchesServerMode(data.stripeMode);
+  return data;
+}
+
+/** After SetupIntent succeeds: subscription in `trialing`; charge at trial end. */
+export async function createTrialSubscription(customerId: string): Promise<{
+  subscriptionId: string;
+  customerId: string;
+  status: string;
+  currentPeriodEnd: string | null;
+  currentPeriodStart: string | null;
+  trialPeriodDays: number;
+  stripeMode?: 'test' | 'live';
+}> {
+  const data = await postJson<{
+    subscriptionId: string;
+    customerId: string;
+    status: string;
+    currentPeriodEnd: string | null;
+    currentPeriodStart: string | null;
+    trialPeriodDays: number;
+    stripeMode?: 'test' | 'live';
+  }>('/create-trial-subscription', { customerId });
+  assertPublishableKeyMatchesServerMode(data.stripeMode);
+  return data;
+}
+
 export async function confirmSubscription(subscriptionId: string): Promise<{
   subscriptionId: string;
   customerId?: string;
   currentPeriodEnd: string | null;
+  currentPeriodStart?: string | null;
   status: string;
 }> {
   return postJson('/confirm-subscription', { subscriptionId });

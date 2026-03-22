@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
@@ -7,19 +7,50 @@ import {
   Alert,
   Platform,
   ScrollView,
+  Switch,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import AppText from '../components/AppText';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { isStripePublishableKeyConfigured } from '../config/stripeEnv';
-import { createSetupIntent, createSubscription, confirmSubscription } from '../services/stripeApi';
+import { STRIPE_TRIAL_DAYS } from '../config/trial';
+import {
+  prepareSubscriptionPayment,
+  confirmSubscription,
+  createSetupIntent,
+  createTrialSubscription,
+} from '../services/stripeApi';
 import { createSubscriptionFromStripe, hasActiveAccess } from '../services/subscription';
+
+const TRIAL_PREF_KEY = 'summit_subscribe_with_trial';
+
+function mapStripeStatusForDb(s: string | undefined): 'active' | 'trialing' {
+  return s === 'trialing' ? 'trialing' : 'active';
+}
+
+function useLogoutToLogin() {
+  const { logout } = useAuth();
+  return () => {
+    Alert.alert('Log out', 'Sign out and return to the login screen?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log out',
+        style: 'destructive',
+        onPress: () => {
+          void logout();
+        },
+      },
+    ]);
+  };
+}
 
 /** Shown on EAS builds when EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY was not set at build time. */
 function SubscribeScreenStripeNotConfigured() {
   const insets = useSafeAreaInsets();
+  const confirmLogout = useLogoutToLogin();
   return (
     <ScrollView
       style={styles.container}
@@ -38,6 +69,9 @@ function SubscribeScreenStripeNotConfigured() {
       <AppText style={styles.cancelNote}>
         Supabase keys must also be set the same way or login and data will not work.
       </AppText>
+      <TouchableOpacity style={styles.logoutButton} onPress={confirmLogout}>
+        <AppText style={styles.logoutButtonText}>Log out</AppText>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -52,8 +86,22 @@ export default function SubscribeScreen() {
 function SubscribeScreenWithStripe() {
   const insets = useSafeAreaInsets();
   const { user, refreshSubscription } = useAuth();
+  const confirmLogout = useLogoutToLogin();
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
+  const [startWithTrial, setStartWithTrial] = useState(false);
+
+  useEffect(() => {
+    void AsyncStorage.getItem(TRIAL_PREF_KEY).then((v) => {
+      if (v === 'true') setStartWithTrial(true);
+      if (v === 'false') setStartWithTrial(false);
+    });
+  }, []);
+
+  const persistTrialChoice = (value: boolean) => {
+    setStartWithTrial(value);
+    void AsyncStorage.setItem(TRIAL_PREF_KEY, value ? 'true' : 'false');
+  };
 
   const handleSubscribe = async () => {
     if (!user?.email || !user?.id) return;
@@ -64,79 +112,104 @@ function SubscribeScreenWithStripe() {
         setLoading(false);
         return;
       }
-      const { clientSecret, customerId } = await createSetupIntent(user.email);
+
       const returnURL = Platform.OS === 'web' ? undefined : 'summit://stripe-redirect';
-      const { error: initError } = await initPaymentSheet({
-        setupIntentClientSecret: clientSecret,
-        merchantDisplayName: 'Summit',
-        returnURL,
-      });
-      if (initError) {
-        const hint =
-          /no such setupintent|resource_missing/i.test(initError.message ?? '')
-            ? '\n\nUsually: app publishable key (pk_test_/pk_live_) must match your server secret key mode from the same Stripe account.'
-            : '';
-        Alert.alert('Error', (initError.message ?? 'Could not initialize payment.') + hint);
-        setLoading(false);
-        return;
-      }
-      const { error: presentError } = await presentPaymentSheet();
-      if (presentError) {
-        if (presentError.code !== 'Canceled') {
-          const msg = presentError.message ?? 'Could not add card.';
-          const hint =
-            /no such setupintent|resource_missing/i.test(msg)
-              ? '\n\nCheck Stripe Dashboard Test/Live toggle: use sk_test_ + pk_test_ together, or sk_live_ + pk_live_, on server and in the app env.'
-              : '';
-          Alert.alert('Payment failed', msg + hint);
-        }
-        setLoading(false);
-        return;
-      }
 
-      const subResponse = await createSubscription(customerId);
-
-      if (subResponse.status === 'requires_payment' && subResponse.clientSecret) {
-        const returnURLPay = Platform.OS === 'web' ? undefined : 'summit://stripe-redirect';
-        const { error: initPayError } = await initPaymentSheet({
-          paymentIntentClientSecret: subResponse.clientSecret,
+      if (startWithTrial) {
+        const { clientSecret, customerId } = await createSetupIntent(user.email);
+        const { error: initError } = await initPaymentSheet({
+          setupIntentClientSecret: clientSecret,
           merchantDisplayName: 'Summit',
-          returnURL: returnURLPay,
+          returnURL,
         });
-        if (initPayError) {
-          Alert.alert('Error', initPayError.message ?? 'Could not complete payment.');
+        if (initError) {
+          const hint =
+            /no such setupintent|resource_missing/i.test(initError.message ?? '')
+              ? '\n\nUsually: app publishable key (pk_test_/pk_live_) must match your server secret key mode from the same Stripe account.'
+              : '';
+          Alert.alert('Error', (initError.message ?? 'Could not initialize payment.') + hint);
           setLoading(false);
           return;
         }
-        const { error: presentPayError } = await presentPaymentSheet();
-        if (presentPayError) {
-          if (presentPayError.code !== 'Canceled') {
-            Alert.alert('Payment failed', presentPayError.message ?? 'Could not complete payment.');
+        const { error: presentError } = await presentPaymentSheet();
+        if (presentError) {
+          if (presentError.code !== 'Canceled') {
+            const msg = presentError.message ?? 'Could not save card.';
+            Alert.alert('Payment failed', msg);
           }
           setLoading(false);
           return;
         }
-        // Give Stripe a moment to update subscription after payment before we confirm
+
+        const trialRes = await createTrialSubscription(customerId);
+        const currentPeriodEnd =
+          trialRes.currentPeriodEnd ??
+          new Date(Date.now() + STRIPE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+        const currentPeriodStart =
+          trialRes.currentPeriodStart ?? new Date().toISOString();
+
+        await createSubscriptionFromStripe(user.id, {
+          currentPeriodEnd,
+          currentPeriodStart,
+          stripeSubscriptionId: trialRes.subscriptionId,
+          stripeCustomerId: trialRes.customerId,
+          status: mapStripeStatusForDb(trialRes.status),
+        });
+        await AsyncStorage.removeItem(TRIAL_PREF_KEY);
+        await refreshSubscription(user.id);
+        await new Promise((r) => setTimeout(r, 50));
+        return;
+      }
+
+      const subResponse = await prepareSubscriptionPayment(user.email);
+
+      if (subResponse.status === 'requires_payment' && subResponse.clientSecret) {
+        const { error: initError } = await initPaymentSheet({
+          paymentIntentClientSecret: subResponse.clientSecret,
+          merchantDisplayName: 'Summit',
+          returnURL,
+        });
+        if (initError) {
+          const hint =
+            /no such payment_intent|resource_missing/i.test(initError.message ?? '')
+              ? '\n\nUsually: app publishable key (pk_test_/pk_live_) must match your server secret key mode from the same Stripe account.'
+              : '';
+          Alert.alert('Error', (initError.message ?? 'Could not initialize payment.') + hint);
+          setLoading(false);
+          return;
+        }
+        const { error: presentError } = await presentPaymentSheet();
+        if (presentError) {
+          if (presentError.code !== 'Canceled') {
+            const msg = presentError.message ?? 'Payment failed.';
+            const hint =
+              /no such payment_intent|resource_missing/i.test(msg)
+                ? '\n\nCheck Stripe Dashboard Test/Live toggle: use sk_test_ + pk_test_ together, or sk_live_ + pk_live_, on server and in the app env.'
+                : '';
+            Alert.alert('Payment failed', msg + hint);
+          }
+          setLoading(false);
+          return;
+        }
         await new Promise((r) => setTimeout(r, 800));
       }
 
-      let currentPeriodEnd: string;
-      let stripeCustomerId: string | undefined = subResponse.customerId;
-      if (subResponse.currentPeriodEnd) {
-        currentPeriodEnd = subResponse.currentPeriodEnd;
-      } else {
-        const confirmed = await confirmSubscription(subResponse.subscriptionId);
-        currentPeriodEnd = confirmed.currentPeriodEnd ?? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        if (confirmed.customerId) stripeCustomerId = confirmed.customerId;
-      }
+      const confirmed = await confirmSubscription(subResponse.subscriptionId);
+      const currentPeriodEnd =
+        confirmed.currentPeriodEnd ??
+        subResponse.currentPeriodEnd ??
+        new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+      const stripeCustomerId = confirmed.customerId ?? subResponse.customerId;
 
       await createSubscriptionFromStripe(user.id, {
         currentPeriodEnd,
+        currentPeriodStart: confirmed.currentPeriodStart ?? subResponse.currentPeriodStart,
         stripeSubscriptionId: subResponse.subscriptionId,
         stripeCustomerId,
+        status: mapStripeStatusForDb(confirmed.status),
       });
+      await AsyncStorage.removeItem(TRIAL_PREF_KEY);
       await refreshSubscription(user.id);
-      // Let React process subscription state update before clearing loading so navigator can switch to home
       await new Promise((r) => setTimeout(r, 50));
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Subscription failed.');
@@ -187,8 +260,29 @@ function SubscribeScreenWithStripe() {
       <AppText style={styles.cancelNote}>Cancel anytime in Settings. No long-term commitment.</AppText>
 
       {!isWeb && (
+        <View style={styles.trialRow}>
+          <View style={styles.trialTextCol}>
+            <AppText style={styles.trialTitle}>Start with a free trial</AppText>
+            <AppText style={styles.trialHint}>
+              {STRIPE_TRIAL_DAYS} days free, then £14.99/month. Add a card now — you won’t be charged until the trial
+              ends.
+            </AppText>
+          </View>
+          <Switch
+            style={styles.trialSwitch}
+            value={startWithTrial}
+            onValueChange={persistTrialChoice}
+            trackColor={{ false: '#cbd5e1', true: '#a5b4fc' }}
+            thumbColor={startWithTrial ? '#6366f1' : '#f4f4f5'}
+            disabled={loading}
+          />
+        </View>
+      )}
+
+      {!isWeb && !startWithTrial && (
         <AppText style={styles.twoStepNote}>
-          You may see two steps: first add your card, then confirm your first payment (e.g. 3D Secure). Both are required to start your subscription.
+          If your bank uses 3D Secure, a short verification may open in the browser and then return to the app
+          automatically.
         </AppText>
       )}
 
@@ -201,10 +295,19 @@ function SubscribeScreenWithStripe() {
           {loading ? (
             <ActivityIndicator color="#fff" />
           ) : (
-            <AppText style={styles.buttonText}>Add payment method & subscribe</AppText>
+            <AppText style={styles.buttonText}>
+              {startWithTrial ? `Start ${STRIPE_TRIAL_DAYS}-day free trial` : 'Subscribe now'}
+            </AppText>
           )}
         </TouchableOpacity>
       )}
+      <TouchableOpacity
+        style={styles.logoutButton}
+        onPress={confirmLogout}
+        disabled={loading}
+      >
+        <AppText style={styles.logoutButtonText}>Log out</AppText>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -283,6 +386,35 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     textAlign: 'center',
   },
+  trialRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    backgroundColor: '#f8fafc',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  trialTextCol: {
+    flex: 1,
+  },
+  trialTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0f172a',
+    marginBottom: 4,
+  },
+  trialHint: {
+    fontSize: 12,
+    color: '#64748b',
+    lineHeight: 17,
+  },
+  trialSwitch: {
+    marginLeft: 8,
+  },
   twoStepNote: {
     fontSize: 12,
     color: '#64748b',
@@ -309,5 +441,21 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  logoutButton: {
+    marginTop: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    minWidth: 260,
+    alignItems: 'center',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#ffffff',
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#64748b',
   },
 });
