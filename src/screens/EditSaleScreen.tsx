@@ -27,44 +27,44 @@ import {
   shadowCardLight,
 } from '../theme/design';
 
-const INVOICE_TILE = '#F5F3FF';
-const INVOICE_ICON = '#4338CA';
+const SALE_TILE = '#ECFDF5';
+const SALE_ICON = '#059669';
 
-export default function EditInvoiceScreen({
+export default function EditSaleScreen({
   route = {},
   navigation,
 }: {
-  route?: { params?: { invoiceId?: string } };
+  route?: { params?: { saleId?: string } };
   navigation: { goBack: () => void };
 }) {
-  const { invoices, categories, updateInvoice } = useApp();
-  const invoiceId = route.params?.invoiceId;
-  const invoice = useMemo(
-    () => (invoiceId ? invoices.find((i) => i.id === invoiceId) : undefined),
-    [invoices, invoiceId]
+  const { sales, categories, updateSale } = useApp();
+  const saleId = route.params?.saleId;
+  const sale = useMemo(
+    () => (saleId ? sales.find((s) => s.id === saleId) : undefined),
+    [sales, saleId]
   );
 
   const [saving, setSaving] = useState(false);
-  const [merchantName, setMerchantName] = useState(invoice?.extracted.merchantName ?? '');
-  const [amount, setAmount] = useState(String(invoice?.extracted.amount ?? ''));
-  const [currency, setCurrency] = useState(invoice?.extracted.currency ?? '');
-  const [date, setDate] = useState(invoice?.extracted.date ?? '');
+  const [merchantName, setMerchantName] = useState(sale?.extracted.merchantName ?? '');
+  const [amount, setAmount] = useState(String(sale?.extracted.amount ?? ''));
+  const [currency, setCurrency] = useState(sale?.extracted.currency ?? '');
+  const [date, setDate] = useState(sale?.extracted.date ?? '');
   const [vatAmount, setVatAmount] = useState(
-    invoice?.extracted.vatAmount != null ? String(invoice.extracted.vatAmount) : ''
+    sale?.extracted.vatAmount != null ? String(sale.extracted.vatAmount) : ''
   );
-  const [merchantAddress, setMerchantAddress] = useState(invoice?.extracted.merchantAddress ?? '');
-  const [merchantPhone, setMerchantPhone] = useState(invoice?.extracted.merchantPhone ?? '');
-  const [merchantEmail, setMerchantEmail] = useState(invoice?.extracted.merchantEmail ?? '');
-  const [supplierName, setSupplierName] = useState(invoice?.extracted.supplierName ?? '');
-  const [paymentType, setPaymentType] = useState(invoice?.extracted.paymentType ?? '');
-  const [ownedBy, setOwnedBy] = useState(invoice?.extracted.ownedBy ?? '');
-  const [documentReference, setDocumentReference] = useState(invoice?.extracted.documentReference ?? '');
-  const [categoryId, setCategoryId] = useState<string | null>(invoice?.categoryId ?? null);
+  const [merchantAddress, setMerchantAddress] = useState(sale?.extracted.merchantAddress ?? '');
+  const [merchantPhone, setMerchantPhone] = useState(sale?.extracted.merchantPhone ?? '');
+  const [merchantEmail, setMerchantEmail] = useState(sale?.extracted.merchantEmail ?? '');
+  const [supplierName, setSupplierName] = useState(sale?.extracted.supplierName ?? '');
+  const [paymentType, setPaymentType] = useState(sale?.extracted.paymentType ?? '');
+  const [ownedBy, setOwnedBy] = useState(sale?.extracted.ownedBy ?? '');
+  const [documentReference, setDocumentReference] = useState(sale?.extracted.documentReference ?? '');
+  const [categoryId, setCategoryId] = useState<string | null>(sale?.categoryId ?? null);
 
-  if (!invoice) {
+  if (!sale) {
     return (
       <View style={styles.container}>
-        <Text style={styles.empty}>Invoice not found.</Text>
+        <Text style={styles.empty}>Sale not found.</Text>
       </View>
     );
   }
@@ -84,11 +84,11 @@ export default function EditInvoiceScreen({
     setSaving(true);
     try {
       const updatedExtracted: ExtractedInvoiceData = {
-        ...invoice.extracted,
+        ...sale.extracted,
         merchantName: merchantName.trim() || undefined,
         amount: numAmount,
         currency: (currency.trim() || 'GBP').toUpperCase(),
-        date: trimmedDate || invoice.extracted.date,
+        date: trimmedDate || sale.extracted.date,
         vatAmount: vatAmount === '' ? undefined : parseFloat(vatAmount) || 0,
         merchantAddress: merchantAddress.trim() || undefined,
         merchantPhone: merchantPhone.trim() || undefined,
@@ -98,7 +98,7 @@ export default function EditInvoiceScreen({
         ownedBy: ownedBy.trim() || undefined,
         documentReference: documentReference.trim() || undefined,
       };
-      await updateInvoice(invoice.id, {
+      await updateSale(sale.id, {
         extracted: updatedExtracted,
         categoryId: categoryId,
       });
@@ -113,11 +113,11 @@ export default function EditInvoiceScreen({
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       <View style={styles.hero}>
-        <View style={[styles.heroIcon, { backgroundColor: INVOICE_TILE }]}>
-          <Ionicons name="receipt-outline" size={28} color={INVOICE_ICON} />
+        <View style={[styles.heroIcon, { backgroundColor: SALE_TILE }]}>
+          <Ionicons name="trending-up-outline" size={28} color={SALE_ICON} />
         </View>
-        <Text style={styles.heroTitle}>Edit invoice</Text>
-        <Text style={styles.heroSubtitle}>Update amounts, dates, and labels. Your receipt stays attached.</Text>
+        <Text style={styles.heroTitle}>Edit sale</Text>
+        <Text style={styles.heroSubtitle}>Update amounts, dates, and labels. Your document stays attached.</Text>
       </View>
 
       <Text style={styles.groupLabel}>Essentials</Text>
@@ -130,10 +130,10 @@ export default function EditInvoiceScreen({
         placeholderTextColor={TEXT_MUTED}
       />
 
-      <Text style={styles.fieldLabel}>Merchant name</Text>
+      <Text style={styles.fieldLabel}>Merchant or customer</Text>
       <TextInput
         style={styles.input}
-        placeholder="Merchant or vendor"
+        placeholder="Name shown on the sale"
         value={merchantName}
         onChangeText={setMerchantName}
         placeholderTextColor={TEXT_MUTED}
@@ -151,7 +151,7 @@ export default function EditInvoiceScreen({
       <Text style={styles.fieldLabel}>Reference (optional)</Text>
       <TextInput
         style={styles.input}
-        placeholder="Invoice number / reference"
+        placeholder="Invoice / order number"
         value={documentReference}
         onChangeText={setDocumentReference}
         placeholderTextColor={TEXT_MUTED}
@@ -227,7 +227,7 @@ export default function EditInvoiceScreen({
       <Text style={styles.fieldLabel}>Owned by / customer</Text>
       <TextInput
         style={styles.input}
-        placeholder="Customer or billed to"
+        placeholder="Who the sale is for"
         value={ownedBy}
         onChangeText={setOwnedBy}
         placeholderTextColor={TEXT_MUTED}

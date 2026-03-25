@@ -9,11 +9,9 @@ import {
   Animated,
   Easing,
   PanResponder,
-  Alert,
-  Platform,
   Modal,
+  Text,
 } from 'react-native';
-import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
@@ -24,14 +22,17 @@ import { format } from 'date-fns';
 import {
   BORDER,
   CARD_BG,
-  GREEN,
   MUTED_CARD,
   PAGE_BG,
   PRIMARY,
   TEXT,
   TEXT_MUTED,
   TEXT_SECONDARY,
+  shadowCardLight,
 } from '../theme/design';
+
+const SALE_TILE = '#ECFDF5';
+const SALE_ICON = '#059669';
 
 const HANDLE_HEIGHT = 88;       // collapsed: drag handle strip
 const HEADER_RESERVED = 56;     // space for nav bar "Sale" so sheet stays below it
@@ -105,12 +106,13 @@ export default function SaleDetailScreen({
   if (!sale) {
     return (
       <View style={styles.container}>
-        <AppText style={styles.empty}>Sale not found.</AppText>
+        <Text style={styles.empty}>Sale not found.</Text>
       </View>
     );
   }
 
   const e = sale.extracted;
+  const pdfFullScreenUri = sale.fileUri ?? sale.fileUris?.[0];
   const isPdf = sale.fileName?.toLowerCase().endsWith('.pdf') ?? sale.fileUri?.toLowerCase().endsWith('.pdf');
   const docImageUris =
     sale.fileUris && sale.fileUris.length > 0
@@ -123,80 +125,105 @@ export default function SaleDetailScreen({
 
   const detailsContent = (
     <>
-      <AppText style={styles.panelTitle}>Sale details</AppText>
-      <View style={styles.header}>
-        <AppText style={styles.merchant}>{e.supplierName ?? e.merchantName ?? 'Unknown'}</AppText>
-        <AppText style={styles.amount}>{formatAmount(e.amount ?? 0, e.currency)}</AppText>
+      <Text style={styles.pullHint}>Swipe up for full details</Text>
+
+      <View style={styles.summaryCard}>
+        <View style={styles.summaryTop}>
+          <View style={[styles.typeBadge, { backgroundColor: SALE_TILE }]}>
+            <Ionicons name="trending-up-outline" size={22} color={SALE_ICON} />
+          </View>
+          <View style={styles.summaryTopText}>
+            <Text style={styles.typeLabel}>Income</Text>
+            <Text style={styles.summaryMerchant} numberOfLines={2}>
+              {e.supplierName ?? e.merchantName ?? 'Unknown'}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.summaryAmount}>{formatAmount(e.amount ?? 0, e.currency)}</Text>
+        <View style={styles.sheetMetaRow}>
+          <View style={styles.metaChip}>
+            <Ionicons name="calendar-outline" size={16} color={TEXT_MUTED} />
+            <Text style={styles.metaChipText}>{e.date ? format(new Date(e.date), 'd MMM yyyy') : '—'}</Text>
+          </View>
+          <View style={styles.metaChip}>
+            <Ionicons name="pricetag-outline" size={16} color={TEXT_MUTED} />
+            <Text style={styles.metaChipText} numberOfLines={1}>
+              {category?.name ?? e.category ?? 'Uncategorised'}
+            </Text>
+          </View>
+        </View>
       </View>
-      <View style={styles.meta}>
-        <AppText style={styles.metaText}>
-          Date: {e.date ? format(new Date(e.date), 'MMM d, yyyy') : '—'}
-        </AppText>
-        <AppText style={styles.metaText}>Category: {category?.name ?? e.category ?? 'Uncategorised'}</AppText>
-      </View>
+
       {(e.documentReference || e.currency || e.paymentType || e.ownedBy) ? (
-        <View style={styles.detailsGrid}>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionCardTitle}>Transaction</Text>
           {e.documentReference ? (
-            <View style={styles.detailRow}>
-              <AppText style={styles.detailLabel}>Reference</AppText>
-              <AppText style={styles.detailValue}>{e.documentReference}</AppText>
+            <View style={styles.kvRow}>
+              <Text style={styles.kvLabel}>Reference</Text>
+              <Text style={styles.kvValue}>{e.documentReference}</Text>
             </View>
           ) : null}
           {e.currency ? (
-            <View style={styles.detailRow}>
-              <AppText style={styles.detailLabel}>Currency</AppText>
-              <AppText style={styles.detailValue}>{e.currency}</AppText>
+            <View style={styles.kvRow}>
+              <Text style={styles.kvLabel}>Currency</Text>
+              <Text style={styles.kvValue}>{e.currency}</Text>
             </View>
           ) : null}
           {e.paymentType ? (
-            <View style={styles.detailRow}>
-              <AppText style={styles.detailLabel}>Payment</AppText>
-              <AppText style={styles.detailValue}>{e.paymentType}</AppText>
+            <View style={styles.kvRow}>
+              <Text style={styles.kvLabel}>Payment</Text>
+              <Text style={styles.kvValue}>{e.paymentType}</Text>
             </View>
           ) : null}
           {e.ownedBy ? (
-            <View style={styles.detailRow}>
-              <AppText style={styles.detailLabel}>Owned by</AppText>
-              <AppText style={styles.detailValue}>{e.ownedBy}</AppText>
+            <View style={styles.kvRow}>
+              <Text style={styles.kvLabel}>Owned by</Text>
+              <Text style={styles.kvValue}>{e.ownedBy}</Text>
             </View>
           ) : null}
         </View>
       ) : null}
+
       {e.merchantName && e.merchantName !== e.supplierName ? (
-        <View style={styles.section}>
-          <AppText style={styles.sectionTitle}>Merchant</AppText>
-          <AppText style={styles.body}>{e.merchantName}</AppText>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionCardTitle}>Also listed as</Text>
+          <Text style={styles.sectionBody}>{e.merchantName}</Text>
         </View>
       ) : null}
-      {(e.merchantAddress || e.merchantPhone || e.merchantEmail) && (
-        <View style={styles.section}>
-          <AppText style={styles.sectionTitle}>Merchant</AppText>
-          {e.merchantAddress ? <AppText style={styles.body}>{e.merchantAddress}</AppText> : null}
-          {e.merchantPhone ? <AppText style={styles.body}>{e.merchantPhone}</AppText> : null}
-          {e.merchantEmail ? <AppText style={styles.body}>{e.merchantEmail}</AppText> : null}
+
+      {(e.merchantAddress || e.merchantPhone || e.merchantEmail) ? (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionCardTitle}>Merchant contact</Text>
+          {e.merchantAddress ? <Text style={styles.sectionBody}>{e.merchantAddress}</Text> : null}
+          {e.merchantPhone ? <Text style={styles.sectionBody}>{e.merchantPhone}</Text> : null}
+          {e.merchantEmail ? <Text style={styles.sectionBody}>{e.merchantEmail}</Text> : null}
         </View>
-      )}
-      {e.vatAmount != null && e.vatAmount > 0 && (
-        <View style={styles.section}>
-          <AppText style={styles.sectionTitle}>VAT</AppText>
-          <AppText style={styles.body}>{formatAmount(e.vatAmount, e.currency)}</AppText>
+      ) : null}
+
+      {e.vatAmount != null && e.vatAmount > 0 ? (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionCardTitle}>VAT / tax</Text>
+          <Text style={styles.sectionBodyStrong}>{formatAmount(e.vatAmount, e.currency)}</Text>
         </View>
-      )}
-      {e.lineItems && e.lineItems.length > 0 && (
-        <View style={styles.section}>
-          <AppText style={styles.sectionTitle}>Line items</AppText>
+      ) : null}
+
+      {e.lineItems && e.lineItems.length > 0 ? (
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionCardTitle}>Line items ({e.lineItems.length})</Text>
           {e.lineItems.map((item) => (
             <View key={item.id} style={styles.lineRow}>
-              <AppText style={styles.lineDesc}>{item.description}</AppText>
-              <AppText style={styles.lineQty}>Qty: {item.quantity}</AppText>
-              <AppText style={styles.linePrice}>
+              <Text style={styles.lineDesc}>{item.description}</Text>
+              <Text style={styles.lineQty}>Qty {item.quantity}</Text>
+              <Text style={styles.linePrice}>
                 {formatAmount(item.totalPrice ?? 0, e.currency)}
-                {item.taxAmount != null && item.taxAmount > 0 && ` (tax: ${formatAmount(item.taxAmount, e.currency)})`}
-              </AppText>
+                {item.taxAmount != null && item.taxAmount > 0
+                  ? ` · tax ${formatAmount(item.taxAmount, e.currency)}`
+                  : ''}
+              </Text>
             </View>
           ))}
         </View>
-      )}
+      ) : null}
     </>
   );
 
@@ -216,9 +243,9 @@ export default function SaleDetailScreen({
               >
                 {docImageUris.map((uri, index) => (
                   <View key={`${uri}-${index}`} style={styles.docSectionWrap}>
-                    <AppText style={styles.docSectionLabel}>
+                    <Text style={styles.docSectionLabel}>
                       Part {index + 1} of {docImageUris.length}
-                    </AppText>
+                    </Text>
                     <Image source={{ uri }} style={styles.docSectionImage} resizeMode="contain" />
                   </View>
                 ))}
@@ -236,7 +263,7 @@ export default function SaleDetailScreen({
         ) : (sale.fileUri || (sale.fileUris && sale.fileUris.length > 0)) && isPdf ? (
           (() => {
             const pdfUri = sale.fileUri ?? sale.fileUris?.[0];
-            if (!pdfUri) return <View style={styles.pdfPlaceholder}><AppText style={styles.pdfPlaceholderText}>No PDF</AppText></View>;
+            if (!pdfUri) return <View style={styles.pdfPlaceholder}><Text style={styles.pdfPlaceholderText}>No PDF</Text></View>;
             return (
               <View style={styles.pdfWebViewContainer}>
                 <WebView
@@ -256,14 +283,14 @@ export default function SaleDetailScreen({
                   activeOpacity={0.8}
                 >
                   <Ionicons name="expand-outline" size={22} color="#f8fafc" />
-                  <AppText style={styles.viewPdfButtonText}>Expand</AppText>
+                  <Text style={styles.viewPdfButtonText}>Expand</Text>
                 </TouchableOpacity>
               </View>
             );
           })()
         ) : (
           <View style={styles.noDocPlaceholder}>
-            <AppText style={styles.noDocText}>No document preview</AppText>
+            <Text style={styles.noDocText}>No document preview</Text>
           </View>
         )}
       </View>
@@ -297,13 +324,13 @@ export default function SaleDetailScreen({
               activeOpacity={0.8}
             >
               <Ionicons name="contract-outline" size={22} color="#f8fafc" />
-              <AppText style={styles.fullscreenCloseText}>Exit full screen</AppText>
+              <Text style={styles.fullscreenCloseText}>Exit full screen</Text>
             </TouchableOpacity>
           )}
         />
       )}
 
-      {isPdf && pdfExpanded && (sale.fileUri ?? sale.fileUris?.[0]) ? (
+      {isPdf && pdfExpanded && pdfFullScreenUri ? (
         <Modal
           visible={pdfExpanded}
           animationType="slide"
@@ -311,7 +338,7 @@ export default function SaleDetailScreen({
         >
           <View style={[styles.pdfFullScreenContainer, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
             <WebView
-              source={{ uri: sale.fileUri ?? sale.fileUris?.[0] }}
+              source={{ uri: pdfFullScreenUri }}
               originWhitelist={['*']}
               allowFileAccess={true}
               style={styles.pdfFullScreenWebView}
@@ -328,7 +355,7 @@ export default function SaleDetailScreen({
               activeOpacity={0.8}
             >
               <Ionicons name="contract-outline" size={22} color="#f8fafc" />
-              <AppText style={styles.pdfExitButtonText}>Exit</AppText>
+              <Text style={styles.pdfExitButtonText}>Exit</Text>
             </TouchableOpacity>
           </View>
         </Modal>
@@ -349,17 +376,21 @@ const styles = StyleSheet.create({
   docScrollContent: { paddingBottom: 16 },
   docSectionWrap: {
     marginBottom: 12,
-    backgroundColor: MUTED_CARD,
-    borderRadius: 8,
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
   docSectionLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: TEXT_SECONDARY,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     backgroundColor: MUTED_CARD,
+    textTransform: 'none',
   },
   docSectionImage: { width: '100%', height: 280 },
   docImage: { width: '100%', height: '100%' },
@@ -383,7 +414,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     marginBottom: 24,
   },
-  fullscreenCloseText: { fontSize: 16, color: TEXT, fontWeight: '600' },
+  fullscreenCloseText: { fontSize: 16, color: '#f8fafc', fontWeight: '600', textTransform: 'none' },
   pdfPlaceholder: {
     flex: 1,
     justifyContent: 'center',
@@ -433,7 +464,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 12,
   },
-  pdfExitButtonText: { fontSize: 16, color: TEXT, fontWeight: '600' },
+  pdfExitButtonText: { fontSize: 16, color: '#f8fafc', fontWeight: '600', textTransform: 'none' },
   viewPdfButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -457,14 +488,16 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: CARD_BG,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 16,
+    borderTopWidth: 1,
+    borderColor: 'rgba(148, 163, 184, 0.25)',
+    shadowColor: '#0f172a',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    elevation: 20,
   },
   handleWrap: {
     minHeight: 44,
@@ -475,43 +508,117 @@ const styles = StyleSheet.create({
     backgroundColor: CARD_BG,
   },
   handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+    width: 44,
+    height: 5,
+    borderRadius: 3,
     backgroundColor: BORDER,
   },
   panelScroll: { flex: 1, backgroundColor: CARD_BG },
-  panelContent: { padding: 20, paddingTop: 4, paddingBottom: 48, backgroundColor: CARD_BG },
-  panelTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: TEXT,
+  panelContent: { padding: 20, paddingTop: 8, paddingBottom: 56, backgroundColor: CARD_BG },
+  pullHint: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: TEXT_SECONDARY,
+    textAlign: 'center',
     marginBottom: 16,
+    textTransform: 'none',
   },
-  header: { marginBottom: 16 },
-  merchant: { fontSize: 20, fontWeight: '700', color: TEXT },
-  amount: { fontSize: 22, fontWeight: '700', color: GREEN, marginTop: 4 },
-  meta: { marginBottom: 16 },
-  metaText: { fontSize: 14, color: TEXT_MUTED },
-  detailsGrid: {
+  summaryCard: {
     backgroundColor: MUTED_CARD,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 20,
+    borderRadius: 20,
+    padding: 18,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-  detailLabel: { fontSize: 13, color: TEXT_MUTED },
-  detailValue: { fontSize: 14, color: TEXT, fontWeight: '500' },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 14, fontWeight: '600', color: TEXT_MUTED, marginBottom: 8 },
-  body: { fontSize: 14, color: TEXT },
+  summaryTop: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 12 },
+  typeBadge: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  summaryTopText: { flex: 1, minWidth: 0 },
+  typeLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  summaryMerchant: { fontSize: 18, fontWeight: '800', color: TEXT, lineHeight: 24, textTransform: 'none' },
+  summaryAmount: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: SALE_ICON,
+    letterSpacing: -0.8,
+    marginBottom: 14,
+    textTransform: 'none',
+  },
+  sheetMetaRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  metaChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: CARD_BG,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: BORDER,
+    maxWidth: '100%',
+  },
+  metaChipText: { fontSize: 13, fontWeight: '600', color: TEXT, flexShrink: 1, textTransform: 'none' },
+  sectionCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
+  },
+  sectionCardTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 12,
+  },
+  kvRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+    gap: 12,
+  },
+  kvLabel: { fontSize: 14, color: TEXT_SECONDARY, flexShrink: 0, textTransform: 'none' },
+  kvValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: TEXT,
+    flex: 1,
+    textAlign: 'right',
+    textTransform: 'none',
+  },
+  sectionBody: { fontSize: 15, color: TEXT, lineHeight: 22, marginBottom: 8, textTransform: 'none' },
+  sectionBodyStrong: { fontSize: 18, fontWeight: '700', color: SALE_ICON, textTransform: 'none' },
   lineRow: {
     backgroundColor: MUTED_CARD,
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
-  lineDesc: { color: TEXT },
-  lineQty: { fontSize: 12, color: TEXT_MUTED, marginTop: 4 },
-  linePrice: { fontSize: 14, color: GREEN, marginTop: 4 },
+  lineDesc: { fontSize: 15, fontWeight: '600', color: TEXT, textTransform: 'none' },
+  lineQty: { fontSize: 13, color: TEXT_MUTED, marginTop: 6, textTransform: 'none' },
+  linePrice: { fontSize: 15, fontWeight: '700', color: SALE_ICON, marginTop: 6, textTransform: 'none' },
 });

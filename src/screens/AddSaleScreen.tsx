@@ -9,8 +9,11 @@ import {
   TextInput,
   Image,
   useWindowDimensions,
+  Platform,
+  Text,
 } from 'react-native';
-import AppText from '../components/AppText';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import ImageView from 'react-native-image-viewing';
@@ -29,14 +32,20 @@ import type { ExtractedInvoiceData } from '../types';
 import {
   BORDER,
   CARD_BG,
-  GREEN,
+  LAVENDER_SOFT,
   MUTED_CARD,
   PAGE_BG,
   PRIMARY,
+  PURPLE_DEEP,
   TEXT,
   TEXT_MUTED,
   TEXT_SECONDARY,
+  shadowCard,
+  shadowCardLight,
 } from '../theme/design';
+
+const SALE_TILE_BG = '#ECFDF5';
+const SALE_ICON = '#059669';
 
 export default function AddSaleScreen({
   navigation,
@@ -47,7 +56,9 @@ export default function AddSaleScreen({
   const { height: winHeight } = useWindowDimensions();
   const { user } = useAuth();
   const { addSale, updateSale, addCategory, categories, sales, currentBusiness } = useApp();
-  const [step, setStep] = useState<'choose' | 'preview' | 'extracting' | 'review' | 'edit' | 'saving'>('choose');
+  const [step, setStep] = useState<
+    'choose' | 'preview' | 'extracting' | 'review' | 'edit' | 'saving' | 'done'
+  >('choose');
   const [extracted, setExtracted] = useState<ExtractedInvoiceData | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string>('');
@@ -310,13 +321,13 @@ export default function AddSaleScreen({
       });
 
       if (urisToUpload.length > 0 && user?.id) {
-        const isPdf = fileName?.toLowerCase().endsWith('.pdf');
+        const isPdfUpload = fileName?.toLowerCase().endsWith('.pdf');
         const urls = await uploadAttachments(
           user.id,
           'sales',
           newSale.id,
           urisToUpload,
-          isPdf
+          isPdfUpload
         );
         await updateSale(newSale.id, {
           fileUri: urls[0],
@@ -324,20 +335,7 @@ export default function AddSaleScreen({
         });
       }
 
-      // Reset state so next time user opens Add they see the choose step, not previous sale
-      setStep('choose');
-      setExtracted(null);
-      setCategoryId(null);
-      setFileName('');
-      setDocumentUri(null);
-      setPendingImageAsset(null);
-      pendingImageAssetsRef.current = [];
-      setPendingImageAssets([]);
-      setPreviewZoomVisible(false);
-      setPreviewZoomIndex(0);
-      const tabNav = navigation.getParent?.() as { navigate: (a: string, b?: { screen: string }) => void } | undefined;
-      if (tabNav) tabNav.navigate('Records', { screen: 'SalesList' });
-      else navigation.navigate('SalesList');
+      setStep('done');
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Save failed.');
       setStep('edit');
@@ -352,26 +350,64 @@ export default function AddSaleScreen({
     setExtracted((prev) => (prev ? { ...prev, [key]: value } : null));
   };
 
+  const finishAndLeave = () => {
+    setStep('choose');
+    setExtracted(null);
+    setCategoryId(null);
+    setFileName('');
+    setDocumentUri(null);
+    setIsPdf(false);
+    setPendingImageAsset(null);
+    pendingImageAssetsRef.current = [];
+    setPendingImageAssets([]);
+    setPreviewZoomVisible(false);
+    setPreviewZoomIndex(0);
+    const tabNav = navigation.getParent?.() as { navigate: (a: string, b?: { screen: string }) => void } | undefined;
+    if (tabNav) tabNav.navigate('Records', { screen: 'SalesList' });
+    else navigation.navigate('SalesList');
+  };
+
   if (step === 'choose') {
     return (
       <View style={[styles.container, { paddingBottom: insets.bottom }]}>
-        <ScrollView style={styles.chooseScroll} contentContainerStyle={[styles.chooseContent, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
-          <AppText style={styles.title}>Add sale</AppText>
-          <AppText style={styles.subtitle}>
-            Take or upload a picture, or upload a PDF of your sale/income. The app will extract
-            merchant, amount, date, and details.
-          </AppText>
-          <TouchableOpacity style={styles.option} onPress={takePhoto}>
-            <AppText style={styles.optionText}>Take photo</AppText>
-            <AppText style={styles.optionSub}>Capture the sale document; add more sections if needed</AppText>
+        <ScrollView
+          style={styles.chooseScroll}
+          contentContainerStyle={[styles.chooseContent, { paddingBottom: insets.bottom + 24 }]}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={styles.heroTitle}>Add sale</Text>
+          <Text style={styles.heroSubtitle}>
+            Scan or upload a sale or income document. We extract merchant, amount, date, and details for you.
+          </Text>
+          <TouchableOpacity style={styles.optionCard} onPress={takePhoto} activeOpacity={0.88}>
+            <View style={[styles.optionIconBlob, { backgroundColor: SALE_TILE_BG }]}>
+              <Ionicons name="camera-outline" size={26} color={SALE_ICON} />
+            </View>
+            <View style={styles.optionBody}>
+              <Text style={styles.optionTitle}>Take photo</Text>
+              <Text style={styles.optionDesc}>Capture the document; add sections if needed</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.option} onPress={pickImage}>
-            <AppText style={styles.optionText}>Upload image</AppText>
-            <AppText style={styles.optionSub}>Choose a photo or scan from your device</AppText>
+          <TouchableOpacity style={styles.optionCard} onPress={pickImage} activeOpacity={0.88}>
+            <View style={[styles.optionIconBlob, { backgroundColor: SALE_TILE_BG }]}>
+              <Ionicons name="images-outline" size={26} color={SALE_ICON} />
+            </View>
+            <View style={styles.optionBody}>
+              <Text style={styles.optionTitle}>Upload image</Text>
+              <Text style={styles.optionDesc}>Choose from your photo library</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.option} onPress={pickDocument}>
-            <AppText style={styles.optionText}>Upload file</AppText>
-            <AppText style={styles.optionSub}>PDF document</AppText>
+          <TouchableOpacity style={styles.optionCard} onPress={pickDocument} activeOpacity={0.88}>
+            <View style={[styles.optionIconBlob, { backgroundColor: SALE_TILE_BG }]}>
+              <Ionicons name="document-text-outline" size={26} color={SALE_ICON} />
+            </View>
+            <View style={styles.optionBody}>
+              <Text style={styles.optionTitle}>Upload PDF</Text>
+              <Text style={styles.optionDesc}>Import a PDF record</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
           </TouchableOpacity>
         </ScrollView>
       </View>
@@ -392,14 +428,16 @@ export default function AddSaleScreen({
     const previewImageSource = previewSections.map((a) => ({ uri: a.uri }));
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.previewContent}>
-        <AppText style={styles.title}>Confirm your file</AppText>
-        <AppText style={styles.previewSubtitle}>
+        <Text style={styles.screenTitle}>Confirm your file</Text>
+        <Text style={styles.screenSubtitle}>
           {previewSections.length > 1
-            ? 'Scroll down to see all parts of the receipt, then confirm or add another section.'
-            : 'Review the image or document below, then confirm or choose another.'}
-        </AppText>
+            ? 'Scroll to see every part, then extract or add another section.'
+            : 'Check the preview below, then extract details or pick a different file.'}
+        </Text>
         {!isPdf && sectionCount > 1 && (
-          <AppText style={styles.sectionCountLabel}>{sectionCount} sections — scroll down to see next part</AppText>
+          <View style={[styles.pillHint, { backgroundColor: SALE_TILE_BG }]}>
+            <Text style={[styles.pillHintText, { color: SALE_ICON }]}>{sectionCount} sections — scroll for next part</Text>
+          </View>
         )}
         {!isPdf && previewSections.length > 0 ? (
           <View style={styles.previewSectionsContainer}>
@@ -411,15 +449,17 @@ export default function AddSaleScreen({
                   setPreviewZoomVisible(true);
                   setPreviewZoomIndex(index);
                 }}
-                activeOpacity={1}
+                activeOpacity={0.95}
               >
                 {previewSections.length > 1 && (
-                  <AppText style={styles.previewSectionLabel}>Part {index + 1} of {previewSections.length}</AppText>
+                  <Text style={styles.previewSectionLabel}>
+                    Part {index + 1} of {previewSections.length}
+                  </Text>
                 )}
                 <Image source={{ uri: section.uri }} style={styles.previewSectionImage} resizeMode="contain" />
               </TouchableOpacity>
             ))}
-            <AppText style={styles.previewZoomHintInline}>Tap any part to zoom and view</AppText>
+            <Text style={styles.previewZoomHintInline}>Tap any part to zoom</Text>
           </View>
         ) : isPdf && documentUri ? (
           <View style={styles.previewBox}>
@@ -432,28 +472,40 @@ export default function AddSaleScreen({
                 scrollEnabled={true}
               />
             </View>
-            <AppText style={styles.pdfFileNamePreview}>{fileName}</AppText>
+            <Text style={styles.pdfFileNamePreview}>{fileName}</Text>
           </View>
         ) : isPdf ? (
           <View style={styles.previewBox}>
             <View style={styles.pdfPlaceholder}>
-              <AppText style={styles.pdfPlaceholderText}>PDF document</AppText>
-              <AppText style={styles.pdfFileName}>{fileName}</AppText>
+              <Ionicons name="document-text-outline" size={40} color={SALE_ICON} />
+              <Text style={styles.pdfPlaceholderText}>PDF document</Text>
+              <Text style={styles.pdfFileName}>{fileName}</Text>
             </View>
           </View>
         ) : null}
         {!isPdf && (
-          <TouchableOpacity style={styles.addSectionBtn} onPress={addAnotherSection}>
-            <AppText style={styles.addSectionBtnText}>+ Add another section</AppText>
-            <AppText style={styles.addSectionBtnSub}>For long receipts, capture the next part in order</AppText>
+          <TouchableOpacity style={styles.addSectionBtn} onPress={addAnotherSection} activeOpacity={0.88}>
+            <Ionicons name="add-circle-outline" size={22} color={SALE_ICON} style={styles.addSectionIcon} />
+            <View style={styles.addSectionTextCol}>
+              <Text style={styles.addSectionBtnText}>Add another section</Text>
+              <Text style={styles.addSectionBtnSub}>For long receipts, capture the next part in order</Text>
+            </View>
           </TouchableOpacity>
         )}
         <View style={styles.previewActions}>
-          <TouchableOpacity style={styles.confirmBtn} onPress={confirmAndExtract}>
-            <AppText style={styles.confirmBtnText}>Confirm & extract</AppText>
+          <TouchableOpacity style={styles.gradientBtnWrap} onPress={confirmAndExtract} activeOpacity={0.92}>
+            <LinearGradient
+              colors={[PRIMARY, PURPLE_DEEP]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.gradientBtn}
+            >
+              <Text style={styles.gradientBtnText}>Confirm & extract</Text>
+              <Ionicons name="sparkles-outline" size={20} color="#fff" style={styles.gradientBtnIcon} />
+            </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.selectAnotherBtn} onPress={selectAnother}>
-            <AppText style={styles.selectAnotherBtnText}>Select another</AppText>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={selectAnother} activeOpacity={0.88}>
+            <Text style={styles.secondaryBtnText}>Choose different file</Text>
           </TouchableOpacity>
         </View>
         {previewImageSource.length > 0 && (
@@ -473,8 +525,11 @@ export default function AddSaleScreen({
   if (step === 'extracting') {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={PRIMARY} />
-        <AppText style={styles.extractingText}>Analysing document…</AppText>
+        <View style={styles.extractingCard}>
+          <ActivityIndicator size="large" color={PRIMARY} />
+          <Text style={styles.extractingTitle}>Reading your document</Text>
+          <Text style={styles.extractingSub}>Extracting merchant, amount, and details…</Text>
+        </View>
       </View>
     );
   }
@@ -482,14 +537,22 @@ export default function AddSaleScreen({
   if (step === 'review' && extracted) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.reviewContent}>
-        <AppText style={styles.title}>Review extracted data</AppText>
-        <AppText style={styles.reviewSubtitle}>View the uploaded document and extracted details</AppText>
+        <View style={styles.reviewHeaderRow}>
+          <View style={[styles.reviewBadge, { backgroundColor: SALE_TILE_BG }]}>
+            <Ionicons name="trending-up-outline" size={20} color={SALE_ICON} />
+          </View>
+          <View style={styles.reviewHeaderText}>
+            <Text style={styles.screenTitle}>Review & save</Text>
+            <Text style={styles.screenSubtitle}>Check details match your sale before saving</Text>
+          </View>
+        </View>
         {documentUri && (
           <View style={styles.docPreview}>
             {isPdf ? (
               <View style={styles.pdfPlaceholder}>
-                <AppText style={styles.pdfPlaceholderText}>PDF document</AppText>
-                <AppText style={styles.pdfFileName}>{fileName}</AppText>
+                <Ionicons name="document-text-outline" size={36} color={SALE_ICON} />
+                <Text style={styles.pdfPlaceholderText}>PDF document</Text>
+                <Text style={styles.pdfFileName}>{fileName}</Text>
               </View>
             ) : (
               <Image source={{ uri: documentUri }} style={styles.docImage} resizeMode="contain" />
@@ -497,18 +560,35 @@ export default function AddSaleScreen({
           </View>
         )}
         <View style={styles.reviewSummary}>
-          <AppText style={styles.reviewMerchant}>{extracted.merchantName ?? '—'}</AppText>
-          <AppText style={styles.reviewAmount}>{formatAmount(extracted.amount ?? 0, extracted.currency)}</AppText>
-          <AppText style={styles.reviewMeta}>
-            {extracted.date ? new Date(extracted.date).toLocaleDateString() : '—'} · {extracted.category ?? 'Uncategorised'}
-          </AppText>
+          <Text style={styles.summaryLabel}>Merchant</Text>
+          <Text style={styles.reviewMerchant}>{extracted.merchantName ?? '—'}</Text>
+          <Text style={styles.summaryLabel}>Amount</Text>
+          <Text style={styles.reviewAmountIncome}>
+            {formatAmount(extracted.amount ?? 0, extracted.currency)}
+          </Text>
+          <View style={styles.reviewMetaRow}>
+            <Ionicons name="calendar-outline" size={16} color={TEXT_MUTED} />
+            <Text style={styles.reviewMeta}>
+              {extracted.date ? new Date(extracted.date).toLocaleDateString() : '—'}
+            </Text>
+            <Text style={styles.reviewMetaDot}>·</Text>
+            <Text style={styles.reviewMeta}>{extracted.category ?? 'Uncategorised'}</Text>
+          </View>
         </View>
         <View style={styles.reviewActions}>
-          <TouchableOpacity style={styles.acceptBtn} onPress={acceptAndSave}>
-            <AppText style={styles.acceptBtnText}>Accept & save</AppText>
+          <TouchableOpacity style={styles.gradientBtnWrap} onPress={acceptAndSave} activeOpacity={0.92}>
+            <LinearGradient
+              colors={[PRIMARY, PURPLE_DEEP]}
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.gradientBtn}
+            >
+              <Text style={styles.gradientBtnText}>Accept & save</Text>
+              <Ionicons name="checkmark-circle-outline" size={22} color="#fff" style={styles.gradientBtnIcon} />
+            </LinearGradient>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.modifyBtn} onPress={() => setStep('edit')}>
-            <AppText style={styles.modifyBtnText}>Modify</AppText>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep('edit')} activeOpacity={0.88}>
+            <Text style={styles.secondaryBtnText}>Edit details</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -518,15 +598,20 @@ export default function AddSaleScreen({
   if ((step === 'edit' || step === 'saving') && extracted) {
     return (
       <ScrollView style={styles.container} contentContainerStyle={styles.editContent}>
-        <AppText style={styles.title}>Modify & save</AppText>
+        <Text style={styles.screenTitle}>Edit details</Text>
+        <Text style={styles.screenSubtitle}>Adjust any fields, then save to your records</Text>
         {documentUri && !isPdf && (
           <View style={styles.docPreviewSmall}>
             <Image source={{ uri: documentUri }} style={styles.docImageSmall} resizeMode="contain" />
           </View>
         )}
         {documentUri && isPdf && (
-          <AppText style={styles.docLabel}>Document: {fileName}</AppText>
+          <View style={styles.pdfNameRow}>
+            <Ionicons name="document-outline" size={18} color={SALE_ICON} />
+            <Text style={styles.docLabel}>{fileName}</Text>
+          </View>
         )}
+        <Text style={styles.fieldLabel}>Merchant</Text>
         <TextInput
           style={styles.input}
           placeholder="Merchant name"
@@ -534,6 +619,7 @@ export default function AddSaleScreen({
           onChangeText={(t) => updateField('merchantName', t || undefined)}
           placeholderTextColor={TEXT_MUTED}
         />
+        <Text style={styles.fieldLabel}>Amount</Text>
         <TextInput
           style={styles.input}
           placeholder={`Amount (${extracted.currency ?? 'GBP'})`}
@@ -542,27 +628,29 @@ export default function AddSaleScreen({
           keyboardType="decimal-pad"
           placeholderTextColor={TEXT_MUTED}
         />
+        <Text style={styles.fieldLabel}>Currency</Text>
         <TextInput
           style={styles.input}
-          placeholder="Currency (e.g. USD, EUR)"
+          placeholder="e.g. GBP, USD, EUR"
           value={extracted.currency ?? ''}
           onChangeText={(t) => updateField('currency', t || undefined)}
           placeholderTextColor={TEXT_MUTED}
         />
+        <Text style={styles.fieldLabel}>Date</Text>
         <TextInput
           style={styles.input}
-          placeholder="Date (YYYY-MM-DD)"
+          placeholder="YYYY-MM-DD"
           value={extracted.date ?? ''}
           onChangeText={(t) => updateField('date', t)}
           placeholderTextColor={TEXT_MUTED}
         />
-        <AppText style={styles.label}>Category</AppText>
+        <Text style={styles.fieldLabel}>Category</Text>
         <View style={styles.chipRow}>
           <TouchableOpacity
             style={[styles.chip, !categoryId && styles.chipActive]}
             onPress={() => setCategoryId(null)}
           >
-            <AppText style={[styles.chipText, !categoryId && styles.chipTextActive]}>None</AppText>
+            <Text style={[styles.chipText, !categoryId && styles.chipTextActive]}>None</Text>
           </TouchableOpacity>
           {categories.map((c) => (
             <TouchableOpacity
@@ -570,18 +658,68 @@ export default function AddSaleScreen({
               style={[styles.chip, categoryId === c.id && styles.chipActive]}
               onPress={() => setCategoryId(categoryId === c.id ? null : c.id)}
             >
-              <AppText style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>{c.name}</AppText>
+              <Text style={[styles.chipText, categoryId === c.id && styles.chipTextActive]}>{c.name}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        <TouchableOpacity style={styles.saveBtn} onPress={save} disabled={step === 'saving'}>
-          {step === 'saving' ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <AppText style={styles.saveBtnText}>Save sale</AppText>
-          )}
+        <TouchableOpacity
+          style={[styles.gradientBtnWrap, step === 'saving' && styles.gradientBtnDisabled]}
+          onPress={save}
+          disabled={step === 'saving'}
+          activeOpacity={0.92}
+        >
+          <LinearGradient
+            colors={[PRIMARY, PURPLE_DEEP]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.gradientBtn}
+          >
+            {step === 'saving' ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={styles.gradientBtnText}>Save sale</Text>
+                <Ionicons name="arrow-forward" size={20} color="#fff" style={styles.gradientBtnIcon} />
+              </>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
+    );
+  }
+
+  if (step === 'done' && extracted) {
+    return (
+      <View style={[styles.container, styles.doneRoot, { paddingBottom: insets.bottom + 24 }]}>
+        <View style={styles.doneCard}>
+          <LinearGradient
+            colors={[SALE_TILE_BG, LAVENDER_SOFT]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.doneIconRing}
+          >
+            <View style={styles.doneIconInner}>
+              <Ionicons name="checkmark" size={44} color={SALE_ICON} />
+            </View>
+          </LinearGradient>
+          <Text style={styles.doneTitle}>Sale saved</Text>
+          <Text style={styles.doneSubtitle}>
+            {extracted.merchantName ?? 'Sale'} · {formatAmount(extracted.amount ?? 0, extracted.currency)}
+          </Text>
+          <Text style={styles.doneHint}>You can find it anytime in Records → Sales</Text>
+        </View>
+        <TouchableOpacity style={styles.gradientBtnWrap} onPress={finishAndLeave} activeOpacity={0.92}>
+          <LinearGradient
+            colors={[PRIMARY, PURPLE_DEEP]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.gradientBtn}
+          >
+            <Text style={styles.gradientBtnText}>View sales</Text>
+            <Ionicons name="list-outline" size={22} color="#fff" style={styles.gradientBtnIcon} />
+          </LinearGradient>
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -590,92 +728,226 @@ export default function AddSaleScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: PAGE_BG },
-  centered: { justifyContent: 'center', alignItems: 'center' },
-  title: { fontSize: 22, fontWeight: '700', color: TEXT, margin: 20 },
-  subtitle: { fontSize: 14, color: TEXT_SECONDARY, marginHorizontal: 20, marginBottom: 20 },
+  centered: { justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24 },
   chooseScroll: { flex: 1 },
-  chooseContent: { paddingBottom: 24 },
-  option: {
-    backgroundColor: MUTED_CARD,
-    borderRadius: 12,
-    padding: 20,
-    marginHorizontal: 20,
-    marginBottom: 12,
+  chooseContent: { paddingTop: 8, paddingHorizontal: 20 },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: TEXT,
+    letterSpacing: -0.4,
+    marginBottom: 8,
   },
-  optionText: { fontSize: 16, fontWeight: '600', color: TEXT },
-  optionSub: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4 },
+  heroSubtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: TEXT_SECONDARY,
+    marginBottom: 24,
+    textTransform: 'none',
+  },
+  optionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD_BG,
+    borderRadius: 18,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
+  },
+  optionIconBlob: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionBody: { flex: 1, marginLeft: 14, marginRight: 8 },
+  optionTitle: { fontSize: 16, fontWeight: '700', color: TEXT, textTransform: 'none' },
+  optionDesc: { fontSize: 13, fontWeight: '500', color: TEXT_MUTED, marginTop: 3, lineHeight: 18, textTransform: 'none' },
+  screenTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: TEXT,
+    letterSpacing: -0.3,
+    marginBottom: 6,
+    textTransform: 'none',
+  },
+  screenSubtitle: {
+    fontSize: 14,
+    lineHeight: 21,
+    color: TEXT_SECONDARY,
+    marginBottom: 20,
+    textTransform: 'none',
+  },
+  pillHint: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    marginBottom: 14,
+  },
+  pillHintText: { fontSize: 13, fontWeight: '600', textTransform: 'none' },
   previewContent: { padding: 20, paddingBottom: 40 },
-  previewSubtitle: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 16 },
-  sectionCountLabel: { fontSize: 14, color: PRIMARY, fontWeight: '600', marginBottom: 12 },
-  previewSectionsContainer: { marginBottom: 16 },
+  previewSectionsContainer: { marginBottom: 12 },
   previewSectionWrap: {
-    marginBottom: 16,
-    borderRadius: 12,
+    marginBottom: 14,
+    borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: MUTED_CARD,
+    backgroundColor: CARD_BG,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
   previewSectionLabel: {
     fontSize: 12,
-    fontWeight: '600',
-    color: TEXT_SECONDARY,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    fontWeight: '700',
+    color: TEXT_MUTED,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
     backgroundColor: MUTED_CARD,
+    textTransform: 'none',
   },
-  previewSectionImage: { width: '100%', height: 260 },
-  previewZoomHintInline: { fontSize: 12, color: TEXT_MUTED, textAlign: 'center', marginBottom: 8 },
+  previewSectionImage: { width: '100%', height: 260, backgroundColor: MUTED_CARD },
+  previewZoomHintInline: {
+    fontSize: 12,
+    color: TEXT_MUTED,
+    textAlign: 'center',
+    marginBottom: 12,
+    textTransform: 'none',
+  },
   addSectionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: MUTED_CARD,
-    borderRadius: 12,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
     borderColor: BORDER,
     borderStyle: 'dashed',
   },
-  addSectionBtnText: { fontSize: 16, fontWeight: '600', color: TEXT },
-  addSectionBtnSub: { fontSize: 13, color: TEXT_MUTED, marginTop: 4 },
+  addSectionIcon: { marginRight: 12 },
+  addSectionTextCol: { flex: 1 },
+  addSectionBtnText: { fontSize: 16, fontWeight: '700', color: TEXT, textTransform: 'none' },
+  addSectionBtnSub: { fontSize: 13, color: TEXT_MUTED, marginTop: 4, textTransform: 'none' },
   previewBox: {
-    marginBottom: 24,
-    borderRadius: 12,
+    marginBottom: 20,
+    borderRadius: 18,
     overflow: 'hidden',
-    backgroundColor: MUTED_CARD,
+    backgroundColor: CARD_BG,
     minHeight: 220,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
-  previewImageTouchable: { width: '100%' },
-  previewImage: { width: '100%', height: 280 },
-  previewZoomHint: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 10,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  previewZoomHintText: { fontSize: 12, color: TEXT, textAlign: 'center' },
   previewActions: { gap: 12 },
-  confirmBtn: { backgroundColor: GREEN, borderRadius: 12, padding: 16, alignItems: 'center' },
-  confirmBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  selectAnotherBtn: {
-    backgroundColor: 'transparent',
-    borderRadius: 12,
-    padding: 16,
+  gradientBtnWrap: {
+    borderRadius: 999,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: PURPLE_DEEP,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 12,
+      },
+      android: { elevation: 4 },
+      default: {},
+    }),
+  },
+  gradientBtnDisabled: { opacity: 0.75 },
+  gradientBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+  },
+  gradientBtnText: { fontSize: 17, fontWeight: '700', color: '#fff', textTransform: 'none' },
+  gradientBtnIcon: { marginLeft: 8 },
+  secondaryBtn: {
+    backgroundColor: CARD_BG,
+    borderRadius: 999,
+    paddingVertical: 16,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: BORDER,
   },
-  selectAnotherBtnText: { color: TEXT_SECONDARY, fontSize: 16, fontWeight: '600' },
-  extractingText: { marginTop: 16, color: TEXT_SECONDARY },
+  secondaryBtnText: { color: TEXT_MUTED, fontSize: 16, fontWeight: '600', textTransform: 'none' },
+  extractingCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 24,
+    paddingVertical: 40,
+    paddingHorizontal: 32,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCard,
+  },
+  extractingTitle: {
+    marginTop: 20,
+    fontSize: 18,
+    fontWeight: '700',
+    color: TEXT,
+    textTransform: 'none',
+  },
+  extractingSub: {
+    marginTop: 8,
+    fontSize: 14,
+    color: TEXT_SECONDARY,
+    textAlign: 'center',
+    textTransform: 'none',
+  },
   reviewContent: { padding: 20, paddingBottom: 40 },
-  reviewSubtitle: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 16 },
-  docPreview: { marginBottom: 20, borderRadius: 12, overflow: 'hidden', backgroundColor: MUTED_CARD, minHeight: 200 },
-  docImage: { width: '100%', height: 280 },
-  docPreviewSmall: { marginBottom: 12, borderRadius: 8, overflow: 'hidden', backgroundColor: MUTED_CARD, alignSelf: 'center' },
+  reviewHeaderRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20, gap: 14 },
+  reviewBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reviewHeaderText: { flex: 1 },
+  docPreview: {
+    marginBottom: 18,
+    borderRadius: 18,
+    overflow: 'hidden',
+    backgroundColor: CARD_BG,
+    minHeight: 200,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
+  },
+  docImage: { width: '100%', height: 280, backgroundColor: MUTED_CARD },
+  docPreviewSmall: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    backgroundColor: CARD_BG,
+    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
   docImageSmall: { width: 200, height: 140 },
-  docLabel: { fontSize: 13, color: TEXT_SECONDARY, marginBottom: 12 },
+  pdfNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: MUTED_CARD,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  docLabel: { fontSize: 14, color: TEXT, flex: 1, fontWeight: '500', textTransform: 'none' },
   pdfPreviewContainer: {
     width: '100%',
-    borderRadius: 12,
+    borderRadius: 0,
     overflow: 'hidden',
     backgroundColor: MUTED_CARD,
   },
@@ -684,44 +956,105 @@ const styles = StyleSheet.create({
     height: '100%',
     backgroundColor: MUTED_CARD,
   },
-  pdfFileNamePreview: { fontSize: 12, color: TEXT_MUTED, marginTop: 8, textAlign: 'center' },
-  pdfPlaceholder: { padding: 24, alignItems: 'center', justifyContent: 'center', minHeight: 120 },
-  pdfPlaceholderText: { color: TEXT_SECONDARY, fontSize: 14 },
-  pdfFileName: { color: TEXT_MUTED, fontSize: 12, marginTop: 4 },
-  reviewSummary: { marginBottom: 24, padding: 16, backgroundColor: MUTED_CARD, borderRadius: 12 },
-  reviewMerchant: { fontSize: 18, fontWeight: '600', color: TEXT },
-  reviewAmount: { fontSize: 22, fontWeight: '700', color: GREEN, marginTop: 8 },
-  reviewMeta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4 },
+  pdfFileNamePreview: { fontSize: 12, color: TEXT_MUTED, marginTop: 8, textAlign: 'center', textTransform: 'none' },
+  pdfPlaceholder: { padding: 28, alignItems: 'center', justifyContent: 'center', minHeight: 140 },
+  pdfPlaceholderText: { color: TEXT_SECONDARY, fontSize: 14, marginTop: 8, textTransform: 'none' },
+  pdfFileName: { color: TEXT_MUTED, fontSize: 12, marginTop: 4, textTransform: 'none' },
+  reviewSummary: {
+    marginBottom: 24,
+    padding: 20,
+    backgroundColor: CARD_BG,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
+  },
+  summaryLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    marginBottom: 4,
+  },
+  reviewMerchant: { fontSize: 20, fontWeight: '700', color: TEXT, marginBottom: 16, textTransform: 'none' },
+  reviewAmountIncome: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: SALE_ICON,
+    marginBottom: 14,
+    letterSpacing: -0.5,
+    textTransform: 'none',
+  },
+  reviewMetaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
+  reviewMeta: { fontSize: 14, color: TEXT_SECONDARY, textTransform: 'none' },
+  reviewMetaDot: { fontSize: 14, color: TEXT_SECONDARY },
   reviewActions: { gap: 12 },
-  acceptBtn: { backgroundColor: GREEN, borderRadius: 12, padding: 16, alignItems: 'center' },
-  acceptBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  modifyBtn: { backgroundColor: MUTED_CARD, borderRadius: 12, padding: 16, alignItems: 'center', borderWidth: 1, borderColor: BORDER },
-  modifyBtnText: { color: TEXT, fontSize: 16, fontWeight: '600' },
   editContent: { padding: 20, paddingBottom: 40 },
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: TEXT_MUTED,
+    marginBottom: 8,
+    textTransform: 'none',
+  },
   input: {
-    backgroundColor: MUTED_CARD,
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: CARD_BG,
+    borderRadius: 14,
+    padding: 16,
     color: TEXT,
     fontSize: 16,
-    marginBottom: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
   },
-  label: { fontSize: 14, color: TEXT_SECONDARY, marginBottom: 8 },
-  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 20 },
+  chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 24 },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
     backgroundColor: MUTED_CARD,
+    borderWidth: 1,
+    borderColor: BORDER,
   },
-  chipActive: { backgroundColor: PRIMARY },
-  chipText: { color: TEXT_SECONDARY, fontSize: 14 },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
-  saveBtn: {
-    backgroundColor: PRIMARY,
-    borderRadius: 12,
-    padding: 16,
+  chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
+  chipText: { color: TEXT_SECONDARY, fontSize: 14, fontWeight: '500', textTransform: 'none' },
+  chipTextActive: { color: '#fff', fontWeight: '700' },
+  doneRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  doneCard: {
     alignItems: 'center',
+    marginBottom: 32,
   },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  doneIconRing: {
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  doneIconInner: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: CARD_BG,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadowCardLight,
+  },
+  doneTitle: { fontSize: 24, fontWeight: '800', color: TEXT, marginBottom: 8, textTransform: 'none' },
+  doneSubtitle: { fontSize: 17, fontWeight: '600', color: TEXT_MUTED, textAlign: 'center', textTransform: 'none' },
+  doneHint: {
+    fontSize: 14,
+    color: TEXT_SECONDARY,
+    textAlign: 'center',
+    marginTop: 12,
+    lineHeight: 20,
+    textTransform: 'none',
+  },
 });

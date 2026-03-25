@@ -6,8 +6,11 @@ import {
   TouchableOpacity,
   TextInput,
   Alert,
+  Text,
+  Platform,
 } from 'react-native';
-import AppText from '../components/AppText';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
 import { useAddPreferred } from '../contexts/AddPreferredContext';
@@ -18,16 +21,19 @@ import type { Sale } from '../types';
 import {
   BORDER,
   CARD_BG,
-  GREEN,
   MUTED_CARD,
   PAGE_BG,
   PRIMARY,
+  PURPLE_DEEP,
   RED,
   TEXT,
   TEXT_MUTED,
   TEXT_SECONDARY,
   shadowCardLight,
 } from '../theme/design';
+
+const SALE_TILE = '#ECFDF5';
+const SALE_ICON = '#059669';
 
 export default function SalesScreen({
   navigation,
@@ -58,27 +64,33 @@ export default function SalesScreen({
       <TouchableOpacity
         style={styles.row}
         onPress={() => navigation.navigate('SaleDetail', { saleId: item.id })}
+        activeOpacity={0.88}
       >
-        <View style={styles.rowLeft}>
-          <AppText style={styles.merchant} numberOfLines={1}>
-            {item.extracted.merchantName ?? item.extracted.ownedBy ?? 'Unknown'}
-          </AppText>
-          <AppText style={styles.meta}>
-            {item.extracted.date ? format(new Date(item.extracted.date), 'MMM d, yyyy') : '—'} ·{' '}
-            {cat?.name ?? item.extracted.category ?? 'Uncategorised'}
-          </AppText>
+        <View style={[styles.rowIcon, { backgroundColor: SALE_TILE }]}>
+          <Ionicons name="trending-up-outline" size={22} color={SALE_ICON} />
         </View>
-        <View style={styles.rowRight}>
-          <AppText style={styles.amount}>{formatAmount(item.extracted.amount ?? 0, item.extracted.currency)}</AppText>
+        <View style={styles.rowMain}>
+          <Text style={styles.merchant} numberOfLines={1}>
+            {item.extracted.merchantName ?? item.extracted.ownedBy ?? 'Unknown'}
+          </Text>
+          <Text style={styles.meta} numberOfLines={1}>
+            {item.extracted.date ? format(new Date(item.extracted.date), 'EEE, d MMM yyyy') : '—'} ·{' '}
+            {cat?.name ?? item.extracted.category ?? 'Uncategorised'}
+          </Text>
+        </View>
+        <View style={styles.rowAside}>
+          <Text style={styles.amount}>{formatAmount(item.extracted.amount ?? 0, item.extracted.currency)}</Text>
           <TouchableOpacity
-            onPress={() =>
-              Alert.alert('Delete sale', 'Remove this sale?', [
+            style={styles.trashWrap}
+            onPress={() => {
+              Alert.alert('Delete sale', 'Remove this sale? This cannot be undone.', [
                 { text: 'Cancel', style: 'cancel' },
                 { text: 'Delete', style: 'destructive', onPress: () => deleteSale(item.id) },
-              ])
-            }
+              ]);
+            }}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
-            <AppText style={styles.deleteBtn}>Delete</AppText>
+            <Ionicons name="trash-outline" size={20} color={RED} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -87,19 +99,22 @@ export default function SalesScreen({
 
   return (
     <View style={styles.container}>
-      <TextInput
-        style={styles.search}
-        placeholder="Search by merchant or category..."
-        value={query}
-        onChangeText={setQuery}
-        placeholderTextColor={TEXT_MUTED}
-      />
+      <View style={styles.searchCard}>
+        <Ionicons name="search-outline" size={22} color={TEXT_MUTED} style={styles.searchIcon} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search merchant, category…"
+          value={query}
+          onChangeText={setQuery}
+          placeholderTextColor={TEXT_MUTED}
+        />
+      </View>
       <View style={styles.filterRow}>
         <TouchableOpacity
           style={[styles.chip, !filterCategoryId && styles.chipActive]}
           onPress={() => setFilterCategoryId(null)}
         >
-          <AppText style={[styles.chipText, !filterCategoryId && styles.chipTextActive]}>All</AppText>
+          <Text style={[styles.chipText, !filterCategoryId && styles.chipTextActive]}>All</Text>
         </TouchableOpacity>
         {categories.map((c) => (
           <TouchableOpacity
@@ -107,7 +122,7 @@ export default function SalesScreen({
             style={[styles.chip, filterCategoryId === c.id && styles.chipActive]}
             onPress={() => setFilterCategoryId(filterCategoryId === c.id ? null : c.id)}
           >
-            <AppText style={[styles.chipText, filterCategoryId === c.id && styles.chipTextActive]}>{c.name}</AppText>
+            <Text style={[styles.chipText, filterCategoryId === c.id && styles.chipTextActive]}>{c.name}</Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -117,21 +132,44 @@ export default function SalesScreen({
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         renderSectionHeader={({ section: { title } }) => (
-          <AppText style={styles.sectionHeader}>{title}</AppText>
+          <View style={styles.sectionHeaderWrap}>
+            <Text style={styles.sectionHeader}>{title}</Text>
+          </View>
         )}
         contentContainerStyle={styles.list}
         stickySectionHeadersEnabled={false}
         ListEmptyComponent={
-          <AppText style={styles.empty}>
-            {sales.length === 0 ? 'No sales yet. Add one from the Add tab.' : 'No matches.'}
-          </AppText>
+          <View style={styles.emptyWrap}>
+            <View style={[styles.emptyIcon, { backgroundColor: SALE_TILE }]}>
+              <Ionicons name="trending-up-outline" size={36} color={SALE_ICON} />
+            </View>
+            <Text style={styles.emptyTitle}>{sales.length === 0 ? 'No sales yet' : 'No matches'}</Text>
+            <Text style={styles.emptySub}>
+              {sales.length === 0
+                ? 'Record income from the Add tab to build your sales list.'
+                : 'Try another search or category filter.'}
+            </Text>
+          </View>
         }
       />
       <TouchableOpacity
-        style={styles.fab}
-        onPress={() => (navigation as { navigate: (a: string, b?: { screen: string }) => void }).navigate('Add', { screen: 'AddSaleRoot' })}
+        style={styles.fabOuter}
+        activeOpacity={0.92}
+        onPress={() =>
+          (navigation as { navigate: (a: string, b?: { screen: string }) => void }).navigate('Add', {
+            screen: 'AddSaleRoot',
+          })
+        }
       >
-        <AppText style={styles.fabText}>+ Add sale</AppText>
+        <LinearGradient
+          colors={[PRIMARY, PURPLE_DEEP]}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={styles.fab}
+        >
+          <Ionicons name="add" size={24} color="#fff" />
+          <Text style={styles.fabText}>Add sale</Text>
+        </LinearGradient>
       </TouchableOpacity>
     </View>
   );
@@ -139,67 +177,106 @@ export default function SalesScreen({
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: PAGE_BG },
-  search: {
-    backgroundColor: MUTED_CARD,
-    borderRadius: 14,
+  listContainer: { flex: 1 },
+  searchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: BORDER,
-    padding: 14,
-    margin: 16,
-    color: TEXT,
-    fontSize: 16,
-  },
-  filterRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 12, gap: 8 },
-  chip: {
+    marginHorizontal: 16,
+    marginTop: 12,
+    marginBottom: 12,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    ...shadowCardLight,
+  },
+  searchIcon: { marginRight: 10 },
+  searchInput: { flex: 1, paddingVertical: 14, fontSize: 16, color: TEXT },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, marginBottom: 8, gap: 8 },
+  chip: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 999,
     backgroundColor: MUTED_CARD,
     borderWidth: 1,
     borderColor: BORDER,
   },
   chipActive: { backgroundColor: PRIMARY, borderColor: PRIMARY },
-  chipText: { color: TEXT_SECONDARY, fontSize: 14 },
-  chipTextActive: { color: '#fff', fontWeight: '600' },
-  listContainer: { flex: 1 },
-  list: { padding: 16, paddingBottom: 80 },
+  chipText: { color: TEXT_SECONDARY, fontSize: 14, fontWeight: '500', textTransform: 'none' },
+  chipTextActive: { color: '#fff', fontWeight: '700' },
+  list: { paddingHorizontal: 16, paddingBottom: 100 },
+  sectionHeaderWrap: { marginTop: 20, marginBottom: 10 },
   sectionHeader: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: TEXT_SECONDARY,
-    marginTop: 16,
-    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: TEXT_MUTED,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   row: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: CARD_BG,
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: BORDER,
     ...shadowCardLight,
   },
-  rowLeft: { flex: 1 },
-  merchant: { fontSize: 16, fontWeight: '600', color: TEXT },
-  meta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4 },
-  rowRight: { alignItems: 'flex-end' },
-  amount: { fontSize: 16, fontWeight: '600', color: GREEN },
-  deleteBtn: { fontSize: 12, color: RED, marginTop: 4 },
-  empty: { color: TEXT_MUTED, textAlign: 'center', marginTop: 40 },
-  fab: {
+  rowIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  rowMain: { flex: 1, minWidth: 0 },
+  merchant: { fontSize: 16, fontWeight: '700', color: TEXT, textTransform: 'none' },
+  meta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4, textTransform: 'none' },
+  rowAside: { alignItems: 'flex-end', marginLeft: 8 },
+  amount: { fontSize: 16, fontWeight: '800', color: SALE_ICON, letterSpacing: -0.3, textTransform: 'none' },
+  trashWrap: { marginTop: 8, padding: 4 },
+  emptyWrap: { alignItems: 'center', paddingTop: 48, paddingHorizontal: 32 },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyTitle: { fontSize: 18, fontWeight: '700', color: TEXT, marginBottom: 8, textTransform: 'none' },
+  emptySub: { fontSize: 15, color: TEXT_SECONDARY, textAlign: 'center', lineHeight: 22, textTransform: 'none' },
+  fabOuter: {
     position: 'absolute',
     bottom: 24,
     left: 20,
     right: 20,
-    backgroundColor: GREEN,
-    padding: 16,
-    borderRadius: 16,
-    alignItems: 'center',
+    borderRadius: 999,
+    overflow: 'hidden',
+    ...Platform.select({
+      ios: {
+        shadowColor: PURPLE_DEEP,
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.28,
+        shadowRadius: 16,
+      },
+      android: { elevation: 6 },
+      default: {},
+    }),
   },
-  fabText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  fab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+  },
+  fabText: { color: '#fff', fontSize: 17, fontWeight: '700', textTransform: 'none' },
 });

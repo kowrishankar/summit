@@ -23,6 +23,7 @@ import AddInvoiceScreen from '../screens/AddInvoiceScreen';
 import AddSaleScreen from '../screens/AddSaleScreen';
 import InvoiceDetailScreen from '../screens/InvoiceDetailScreen';
 import EditInvoiceScreen from '../screens/EditInvoiceScreen';
+import EditSaleScreen from '../screens/EditSaleScreen';
 import BusinessSwitchScreen from '../screens/BusinessSwitchScreen';
 import DashboardScreen from '../screens/DashboardScreen';
 import {
@@ -99,7 +100,26 @@ function RecordsStack() {
         })}
       />
       <Stack.Screen name="EditInvoice" component={EditInvoiceScreen} options={{ title: 'Edit invoice' }} />
-      <Stack.Screen name="SaleDetail" component={SaleDetailScreen} options={{ title: 'Sale' }} />
+      <Stack.Screen
+        name="SaleDetail"
+        component={SaleDetailScreen}
+        options={({ route, navigation }) => ({
+          title: 'Sale',
+          headerRight: () => {
+            const params = route.params as { saleId?: string } | undefined;
+            if (!params?.saleId) return null;
+            return (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('EditSale', { saleId: params.saleId })}
+                style={{ marginRight: 16 }}
+              >
+                <AppText style={{ color: PRIMARY, fontWeight: '600', fontSize: 16 }}>Edit</AppText>
+              </TouchableOpacity>
+            );
+          },
+        })}
+      />
+      <Stack.Screen name="EditSale" component={EditSaleScreen} options={{ title: 'Edit sale' }} />
     </Stack.Navigator>
   );
 }
