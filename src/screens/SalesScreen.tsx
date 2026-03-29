@@ -20,8 +20,10 @@ import { format } from 'date-fns';
 import { groupByReceiptDate } from '../utils/groupByReceiptDate';
 import type { Sale, ReviewStatus } from '../types';
 import {
+  AMBER,
   BORDER,
   CARD_BG,
+  GREEN,
   MUTED_CARD,
   PAGE_BG,
   PRIMARY,
@@ -92,16 +94,6 @@ export default function SalesScreen({
             <Text style={styles.merchant} numberOfLines={1}>
               {item.extracted.merchantName ?? item.extracted.ownedBy ?? 'Unknown'}
             </Text>
-            {rs === 'processing' ? (
-              <View style={styles.statusPillProcessing}>
-                <Text style={styles.statusPillProcessingText}>Processing</Text>
-              </View>
-            ) : null}
-            {rs === 'pending_review' ? (
-              <View style={styles.statusPillReview}>
-                <Text style={styles.statusPillReviewText}>Review</Text>
-              </View>
-            ) : null}
             {rs === 'failed' ? (
               <View style={styles.statusPillFailed}>
                 <Text style={styles.statusPillFailedText}>Failed</Text>
@@ -119,6 +111,11 @@ export default function SalesScreen({
           </Text>
         </View>
         <View style={styles.rowAside}>
+          {rs === 'processing' || rs === 'pending_review' ? (
+            <Ionicons name="alert-circle" size={22} color={AMBER} style={styles.rowReviewIcon} />
+          ) : rs === 'complete' ? (
+            <Ionicons name="checkmark-circle" size={22} color={GREEN} style={styles.rowReviewIcon} />
+          ) : null}
           <Text style={styles.amount}>{formatAmount(item.extracted.amount ?? 0, item.extracted.currency)}</Text>
           <TouchableOpacity
             style={styles.trashWrap}
@@ -285,20 +282,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   dupPillText: { fontSize: 10, fontWeight: '800', color: '#C2410C', textTransform: 'uppercase' },
-  statusPillProcessing: {
-    backgroundColor: '#E0E7FF',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  statusPillProcessingText: { fontSize: 10, fontWeight: '800', color: '#3730A3', textTransform: 'uppercase' },
-  statusPillReview: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-  },
-  statusPillReviewText: { fontSize: 10, fontWeight: '800', color: '#166534', textTransform: 'uppercase' },
+  rowReviewIcon: { marginBottom: 4 },
   statusPillFailed: {
     backgroundColor: '#FEE2E2',
     paddingHorizontal: 8,

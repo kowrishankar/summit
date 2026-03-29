@@ -19,6 +19,7 @@ import { useAddPreferred } from '../contexts/AddPreferredContext';
 import type { ReviewStatus } from '../types';
 import { formatAmount } from '../utils/currency';
 import {
+  AMBER,
   BORDER,
   CARD_BG,
   GREEN,
@@ -65,7 +66,6 @@ interface ActivityRow {
   amount: number;
   currency?: string;
   categoryLabel: string;
-  verified: boolean;
   isDuplicate?: boolean;
   /** Open Add flow to review instead of detail when set. */
   reviewBanner?: 'processing' | 'review' | 'failed';
@@ -213,7 +213,6 @@ export default function HomeScreen({
         amount: inv.extracted.amount ?? 0,
         currency: inv.extracted.currency,
         categoryLabel: cat,
-        verified: Boolean(merchant),
         isDuplicate: inv.extracted.isDuplicate,
         reviewBanner:
           rs === 'processing' ? 'processing' : rs === 'pending_review' ? 'review' : rs === 'failed' ? 'failed' : undefined,
@@ -254,7 +253,6 @@ export default function HomeScreen({
         amount: s.extracted.amount ?? 0,
         currency: s.extracted.currency,
         categoryLabel: cat,
-        verified: Boolean(merchant),
         isDuplicate: s.extracted.isDuplicate,
         reviewBanner:
           rs === 'processing' ? 'processing' : rs === 'pending_review' ? 'review' : rs === 'failed' ? 'failed' : undefined,
@@ -554,22 +552,15 @@ export default function HomeScreen({
                     <AppText style={styles.activityDupPillText}>Dup</AppText>
                   </View>
                 ) : null}
-                {row.reviewBanner === 'processing' ? (
-                  <View style={styles.activityProcessingPill}>
-                    <AppText style={styles.activityProcessingPillText}>Processing</AppText>
-                  </View>
-                ) : null}
-                {row.reviewBanner === 'review' ? (
-                  <View style={styles.activityReviewPill}>
-                    <AppText style={styles.activityReviewPillText}>Review</AppText>
-                  </View>
+                {row.reviewBanner === 'processing' || row.reviewBanner === 'review' ? (
+                  <Ionicons name="alert-circle" size={18} color={AMBER} style={styles.activityReviewIcon} />
                 ) : null}
                 {row.reviewBanner === 'failed' ? (
                   <View style={styles.activityFailedPill}>
                     <AppText style={styles.activityFailedPillText}>Failed</AppText>
                   </View>
                 ) : null}
-                {row.verified ? (
+                {!row.reviewBanner ? (
                   <Ionicons name="checkmark-circle" size={18} color={GREEN} style={styles.verifiedCheck} />
                 ) : null}
               </View>
@@ -978,20 +969,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   activityDupPillText: { fontSize: 10, fontWeight: '800', color: '#C2410C' },
-  activityProcessingPill: {
-    backgroundColor: '#E0E7FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  activityProcessingPillText: { fontSize: 10, fontWeight: '800', color: '#3730A3' },
-  activityReviewPill: {
-    backgroundColor: '#DCFCE7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  activityReviewPillText: { fontSize: 10, fontWeight: '800', color: '#166534' },
+  activityReviewIcon: { marginTop: 1 },
   activityFailedPill: {
     backgroundColor: '#FEE2E2',
     paddingHorizontal: 6,

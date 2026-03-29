@@ -40,30 +40,33 @@ const KIND_OPTIONS: {
   {
     kind: 'individual',
     title: 'Personal',
-    body: 'Track your own income and spending. After sign-up you’ll subscribe to Summit. No inviting others or joining teams.',
+    body: 'Track your own income and spending',
     icon: 'person-outline',
   },
   {
     kind: 'business',
     title: 'Business',
-    body: 'Invoices and sales for your business. After sign-up you’ll subscribe to Summit. Solo account—no invites or joining teams.',
+    body: 'Invoices and sales for your business',
     icon: 'storefront-outline',
   },
   {
     kind: 'practice',
     title: 'Practice',
-    body: 'Accountants: add client businesses at no extra fee on your plan; clients claim with a code. You subscribe for your practice workspace.',
+    body: 'Accountants: add client businesses to your plan',
     icon: 'briefcase-outline',
   },
 ];
 
 type SignupPath = 'standard' | 'claim';
 
+type SignupStep = 1 | 2 | 3;
+
 export default function SignupScreen({ navigation }: { navigation: { navigate: (s: string) => void } }) {
   const insets = useSafeAreaInsets();
   const { signup } = useAuth();
-  const [signupPath, setSignupPath] = useState<SignupPath>('standard');
-  const [accountKind, setAccountKind] = useState<AccountKind>('individual');
+  const [step, setStep] = useState<SignupStep>(1);
+  const [signupPath, setSignupPath] = useState<SignupPath | null>(null);
+  const [accountKind, setAccountKind] = useState<AccountKind | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -72,7 +75,40 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
   const [claimCode, setClaimCode] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const selectJoinPath = (path: SignupPath) => {
+    setSignupPath(path);
+    if (path === 'standard') {
+      setAccountKind(null);
+      setStep(2);
+    } else {
+      setStep(3);
+    }
+  };
+
+  const selectAccountKindAndContinue = (kind: AccountKind) => {
+    setAccountKind(kind);
+    setStep(3);
+  };
+
+  const goBackStep = () => {
+    if (step === 3) {
+      if (signupPath === 'claim') {
+        setStep(1);
+        setSignupPath(null);
+      } else {
+        setStep(2);
+      }
+    } else if (step === 2) {
+      setStep(1);
+      setSignupPath(null);
+    }
+  };
+
   const handleSignup = async () => {
+    if (!signupPath) {
+      Alert.alert('Error', 'Choose how you are joining.');
+      return;
+    }
     if (!email.trim() || !password) {
       Alert.alert('Error', 'Please enter email and password.');
       return;
@@ -90,6 +126,9 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
         Alert.alert('Error', 'Enter the claim code your accountant sent you.');
         return;
       }
+    } else if (!accountKind) {
+      Alert.alert('Error', 'Choose how you’re signing up (personal, business, or practice).');
+      return;
     } else if (accountKind === 'business' && !businessName.trim()) {
       Alert.alert('Error', 'Please enter your business name.');
       return;
@@ -97,7 +136,7 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
     setLoading(true);
     try {
       const result = await signup(email.trim(), password, {
-        accountKind: signupPath === 'claim' ? 'business' : accountKind,
+        accountKind: signupPath === 'claim' ? 'business' : accountKind!,
         businessName:
           signupPath === 'claim' ? undefined : accountKind === 'practice' ? undefined : businessName.trim() || undefined,
         businessAddress:
@@ -122,73 +161,77 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+          {
+            paddingTop: insets.top + 60,
+            paddingBottom: insets.bottom + 28,
+          },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <AppText style={styles.title}>Create account</AppText>
+        {step > 1 ? (
+          <TouchableOpacity style={styles.backRow} onPress={goBackStep} hitSlop={12} activeOpacity={0.7}>
+            <Ionicons name="chevron-back" size={22} color={PRIMARY} />
+            <AppText style={styles.backText}>Back</AppText>
+          </TouchableOpacity>
+        ) : null}
         <AppText style={styles.subtitle}>
-          {signupPath === 'claim'
-            ? 'Claim the workspace your accountant set up — no separate Summit payment.'
-            : 'Tell us how you’ll use Summit'}
+          {step === 1
+            ? 'Choose how you’re joining.'
+            : step === 2
+              ? 'Pick the account type that fits you.'
+              : signupPath === 'claim'
+                ? 'Claim the workspace your accountant set up — no separate Summit payment.'
+                : 'Enter your details to finish.'}
         </AppText>
 
-        <AppText style={styles.sectionLabel}>How are you joining?</AppText>
-        <TouchableOpacity
-          style={[styles.pathCard, signupPath === 'standard' && styles.pathCardSelected]}
-          onPress={() => setSignupPath('standard')}
-          activeOpacity={0.88}
-        >
-          <View style={[styles.kindIconWrap, signupPath === 'standard' && styles.kindIconWrapSelected]}>
-            <Ionicons name="person-add-outline" size={22} color={signupPath === 'standard' ? '#fff' : PRIMARY} />
-          </View>
-          <View style={styles.kindTextCol}>
-            <AppText style={styles.kindTitle}>New Account</AppText>
-            <AppText style={styles.kindBody}>Personal, business, or practice—then subscribe (except claim path)</AppText>
-          </View>
-          {signupPath === 'standard' ? (
-            <Ionicons name="checkmark-circle" size={24} color={PRIMARY} />
-          ) : (
-            <View style={styles.kindRadioOuter}>
-              <View style={styles.kindRadioInner} />
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.pathCard, signupPath === 'claim' && styles.pathCardSelected]}
-          onPress={() => setSignupPath('claim')}
-          activeOpacity={0.88}
-        >
-          <View style={[styles.kindIconWrap, signupPath === 'claim' && styles.kindIconWrapSelected]}>
-            <Ionicons name="ribbon-outline" size={22} color={signupPath === 'claim' ? '#fff' : PRIMARY} />
-          </View>
-          <View style={styles.kindTextCol}>
-            <AppText style={styles.kindTitle}>Invited by Practice</AppText>
-            <AppText style={styles.kindBody}>
-              Your accountant already pays for your workspace on their practice plan. Use the email they used for you
-              and the claim code they sent.
-            </AppText>
-          </View>
-          {signupPath === 'claim' ? (
-            <Ionicons name="checkmark-circle" size={24} color={PRIMARY} />
-          ) : (
-            <View style={styles.kindRadioOuter}>
-              <View style={styles.kindRadioInner} />
-            </View>
-          )}
-        </TouchableOpacity>
+        {step === 1 && (
+          <>
+            <AppText style={styles.sectionLabel}>How are you joining?</AppText>
+            <TouchableOpacity
+              style={[styles.pathCard, signupPath === 'standard' && styles.pathCardSelected]}
+              onPress={() => selectJoinPath('standard')}
+              activeOpacity={0.88}
+            >
+              <View style={[styles.kindIconWrap, signupPath === 'standard' && styles.kindIconWrapSelected]}>
+                <Ionicons name="person-add-outline" size={22} color={signupPath === 'standard' ? '#fff' : PRIMARY} />
+              </View>
+              <View style={styles.kindTextCol}>
+                <AppText style={styles.kindTitle}>New Account</AppText>
+                <AppText style={styles.kindBody}>Personal, business, or practice</AppText>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.pathCard, signupPath === 'claim' && styles.pathCardSelected]}
+              onPress={() => selectJoinPath('claim')}
+              activeOpacity={0.88}
+            >
+              <View style={[styles.kindIconWrap, signupPath === 'claim' && styles.kindIconWrapSelected]}>
+                <Ionicons name="ribbon-outline" size={22} color={signupPath === 'claim' ? '#fff' : PRIMARY} />
+              </View>
+              <View style={styles.kindTextCol}>
+                <AppText style={styles.kindTitle}>Invited by Practice</AppText>
+                <AppText style={styles.kindBody}>
+                  Use the email they used for you and the claim code they sent.
+                </AppText>
+              </View>
+              <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
+            </TouchableOpacity>
+          </>
+        )}
 
-        {signupPath === 'standard' && (
+        {step === 2 && signupPath === 'standard' && (
           <>
             <AppText style={styles.sectionLabel}>I’m signing up as</AppText>
             {KIND_OPTIONS.map((opt) => {
-              const selected = accountKind === opt.kind;
+              const selected = accountKind !== null && accountKind === opt.kind;
               return (
                 <TouchableOpacity
                   key={opt.kind}
                   style={[styles.kindCard, selected && styles.kindCardSelected]}
-                  onPress={() => setAccountKind(opt.kind)}
+                  onPress={() => selectAccountKindAndContinue(opt.kind)}
                   activeOpacity={0.88}
                 >
                   <View style={[styles.kindIconWrap, selected && styles.kindIconWrapSelected]}>
@@ -198,19 +241,15 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
                     <AppText style={styles.kindTitle}>{opt.title}</AppText>
                     <AppText style={styles.kindBody}>{opt.body}</AppText>
                   </View>
-                  {selected ? (
-                    <Ionicons name="checkmark-circle" size={24} color={PRIMARY} />
-                  ) : (
-                    <View style={styles.kindRadioOuter}>
-                      <View style={styles.kindRadioInner} />
-                    </View>
-                  )}
+                  <Ionicons name="chevron-forward" size={22} color={TEXT_MUTED} />
                 </TouchableOpacity>
               );
             })}
           </>
         )}
 
+        {step === 3 && signupPath ? (
+          <>
         <TextInput
           style={styles.input}
           placeholder="Email"
@@ -240,7 +279,7 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
           placeholderTextColor={TEXT_MUTED}
         />
 
-        {signupPath === 'claim' && (
+        {signupPath === 'claim' ? (
           <>
             <AppText style={styles.sectionLabel}>Claim code</AppText>
             <TextInput
@@ -260,9 +299,9 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
               </AppText>
             </View>
           </>
-        )}
+        ) : null}
 
-        {signupPath === 'standard' && accountKind !== 'practice' && (
+        {signupPath === 'standard' && accountKind !== 'practice' ? (
           <>
             <AppText style={styles.sectionLabel}>
               {accountKind === 'business' ? 'Business details' : 'Business (optional for personal)'}
@@ -287,9 +326,9 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
               </AppText>
             )}
           </>
-        )}
+        ) : null}
 
-        {signupPath === 'standard' && accountKind === 'practice' && (
+        {signupPath === 'standard' && accountKind === 'practice' ? (
           <View style={styles.practiceInfo}>
             <Ionicons name="information-circle-outline" size={22} color={PRIMARY} style={styles.practiceInfoIcon} />
             <AppText style={styles.practiceInfoText}>
@@ -298,7 +337,7 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
               workspace name and address anytime.
             </AppText>
           </View>
-        )}
+        ) : null}
 
         <TouchableOpacity
           activeOpacity={0.92}
@@ -319,6 +358,9 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
             )}
           </LinearGradient>
         </TouchableOpacity>
+          </>
+        ) : null}
+
         <TouchableOpacity onPress={() => navigation.navigate('Login')}>
           <AppText style={styles.link}>Already have an account? Sign in</AppText>
         </TouchableOpacity>
@@ -347,6 +389,18 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: TEXT_SECONDARY,
     marginBottom: 20,
+  },
+  backRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    marginBottom: 12,
+    gap: 4,
+  },
+  backText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: PRIMARY,
   },
   sectionLabel: {
     fontSize: 14,

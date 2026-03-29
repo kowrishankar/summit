@@ -17,6 +17,8 @@ export const TEXT = '#0f172a';
 export const TEXT_MUTED = '#64748b';
 export const TEXT_SECONDARY = '#94a3b8';
 export const RED = '#ef4444';
+/** Needs review / attention (processing, pending review) */
+export const AMBER = '#d97706';
 
 /** Primary actions, links, active chips */
 export const PRIMARY = PURPLE;
