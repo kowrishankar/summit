@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTabBarScrollToTop } from '../hooks/useTabBarScrollToTop';
 import { useApp } from '../contexts/AppContext';
 import { useAddPreferred } from '../contexts/AddPreferredContext';
 import { formatAmount } from '../utils/currency';
@@ -51,6 +52,9 @@ export default function SalesScreen({
       return () => {};
     }, [setPreferredAddType])
   );
+
+  const listRef = useRef<SectionList<Sale>>(null);
+  useTabBarScrollToTop(listRef);
 
   const filtered = searchSales(query, filterCategoryId ? { categoryId: filterCategoryId } : undefined);
   const sections = useMemo(
@@ -163,6 +167,7 @@ export default function SalesScreen({
         ))}
       </View>
       <SectionList
+        ref={listRef}
         style={styles.listContainer}
         sections={sections}
         keyExtractor={(item) => item.id}

@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef } from 'react';
+import { useScrollToTop } from '@react-navigation/native';
 import {
   View,
   StyleSheet,
@@ -295,8 +296,12 @@ export default function HomeScreen({
     }
   };
 
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
+
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.screen}
       contentContainerStyle={[
         styles.scrollContent,

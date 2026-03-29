@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import {
   View,
   StyleSheet,
@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTabBarScrollToTop } from '../hooks/useTabBarScrollToTop';
 import { useApp } from '../contexts/AppContext';
 import { useAddPreferred } from '../contexts/AddPreferredContext';
 import { formatAmount } from '../utils/currency';
@@ -51,6 +52,9 @@ export default function InvoicesScreen({
       return () => {};
     }, [setPreferredAddType])
   );
+
+  const listRef = useRef<SectionList<Invoice>>(null);
+  useTabBarScrollToTop(listRef);
 
   const filtered = searchInvoices(query, filterCategoryId ? { categoryId: filterCategoryId } : undefined);
   const sections = useMemo(
@@ -163,6 +167,7 @@ export default function InvoicesScreen({
         ))}
       </View>
       <SectionList
+        ref={listRef}
         sections={sections}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}

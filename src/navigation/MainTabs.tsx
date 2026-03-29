@@ -6,10 +6,14 @@ import {
   Modal,
   Pressable,
   Platform,
+  InteractionManager,
 } from 'react-native';
 import AppText from '../components/AppText';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import {
+  createBottomTabNavigator,
+  type BottomTabBarProps,
+} from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import { AddPreferredProvider } from '../contexts/AddPreferredContext';
@@ -81,7 +85,21 @@ function HomeStack() {
 
 function RecordsStack() {
   return (
-    <Stack.Navigator screenOptions={headerScreenOptions} initialRouteName="InvoicesList">
+    <Stack.Navigator
+      screenOptions={headerScreenOptions}
+      initialRouteName="InvoicesList"
+      screenListeners={({ navigation }) => ({
+        tabPress: (e) => {
+          const s = navigation.getState();
+          const currentName = s.routes[s.index]?.name;
+          // Native stack pops to index 0 (InvoicesList). Override for sale flows so we return to Sales.
+          if (currentName === 'SaleDetail' || currentName === 'EditSale') {
+            e.preventDefault();
+            navigation.navigate('SalesList');
+          }
+        },
+      })}
+    >
       <Stack.Screen name="InvoicesList" component={InvoicesScreen} options={{ title: 'Invoices' }} />
       <Stack.Screen name="SalesList" component={SalesScreen} options={{ title: 'Sales' }} />
       <Stack.Screen
@@ -138,6 +156,32 @@ function AddStack() {
 }
 
 const RECORDS_TAB_NAME = 'Records';
+
+function getNestedRouteName(route: {
+  state?: { index?: number; routes?: { name?: string }[] };
+}): string | undefined {
+  const s = route.state;
+  if (s == null || !s.routes?.length) return undefined;
+  const idx = typeof s.index === 'number' ? s.index : 0;
+  return s.routes[idx]?.name;
+}
+
+/**
+ * After native stack handles tabPress (pop to root), emit once more so useScrollToTop runs on the list/home screen.
+ * Must not call navigate() here — native stack already pops; duplicate navigate caused a double transition.
+ */
+function scheduleScrollTabPressAfterPop(
+  navigation: BottomTabBarProps['navigation'],
+  routeKey: string
+) {
+  InteractionManager.runAfterInteractions(() => {
+    navigation.emit({
+      type: 'tabPress',
+      target: routeKey,
+      canPreventDefault: true,
+    });
+  });
+}
 
 function RecordsTabBarPopup({
   visible,
@@ -383,14 +427,11 @@ function tabIconName(
   return 'ellipse';
 }
 
-function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Navigator']>['tabBar']) {
+function CustomTabBar(props: BottomTabBarProps) {
   const [recordsPopupVisible, setRecordsPopupVisible] = useState(false);
   const [addPopupVisible, setAddPopupVisible] = useState(false);
   const insets = useSafeAreaInsets();
-  const { state, navigation } = props as {
-    state: { index: number; routeNames: string[] };
-    navigation: { navigate: (name: string, params?: { screen: string }) => void };
-  };
+  const { state, navigation } = props;
 
   const selectInvoices = () => {
     navigation.navigate(RECORDS_TAB_NAME, { screen: 'InvoicesList' });
@@ -414,7 +455,8 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
     <>
       <View style={[tabBarStyles.tabBarOuter, { paddingBottom: bottomPad }]}>
         <View style={tabBarStyles.tabBarPill}>
-          {state.routeNames.map((name, index) => {
+          {state.routes.map((route, index) => {
+            const name = route.name;
             const isRecords = name === RECORDS_TAB_NAME;
             const isAdd = name === 'Add';
             const isFocused = state.index === index;
@@ -463,9 +505,41 @@ function CustomTabBar(props: React.ComponentProps<ReturnType<typeof Tab>['Naviga
                 ]}
                 android_ripple={{ color: 'rgba(30, 41, 59, 0.08)', foreground: true }}
                 onPress={() => {
+                  const routeKey = route.key;
+                  const emitTabPress = () =>
+                    navigation.emit({
+                      type: 'tabPress',
+                      target: routeKey,
+                      canPreventDefault: true,
+                    });
+
                   if (isRecords) {
+                    emitTabPress();
+                    if (isFocused) {
+                      const nested = getNestedRouteName(route);
+                      if (
+                        nested &&
+                        nested !== 'InvoicesList' &&
+                        nested !== 'SalesList'
+                      ) {
+                        scheduleScrollTabPressAfterPop(navigation, routeKey);
+                      }
+                    }
                     setRecordsPopupVisible(true);
-                  } else {
+                    return;
+                  }
+
+                  emitTabPress();
+
+                  if (name === 'Dashboard' && isFocused) {
+                    const nested = getNestedRouteName(route);
+                    if (nested && nested !== 'HomeMain') {
+                      scheduleScrollTabPressAfterPop(navigation, routeKey);
+                      return;
+                    }
+                  }
+
+                  if (!isFocused) {
                     navigation.navigate(name);
                   }
                 }}

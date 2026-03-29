@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
+import { useScrollToTop } from '@react-navigation/native';
 import {
   View,
   StyleSheet,
@@ -141,6 +142,9 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
 
   const invoiceCount = invoices.length;
 
+  const scrollRef = useRef<ScrollView>(null);
+  useScrollToTop(scrollRef);
+
   return (
     <View style={[styles.root, { paddingTop: insets.top }]}>
       <View style={styles.header}>
@@ -186,6 +190,7 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         style={styles.scroll}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 100 }]}
         showsVerticalScrollIndicator={false}
