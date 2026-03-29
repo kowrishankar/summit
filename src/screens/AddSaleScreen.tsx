@@ -29,6 +29,7 @@ import { renderPdfFirstPageToImageBase64 } from '../services/pdfText';
 import { formatAmount } from '../utils/currency';
 import { maybeSaveCameraImageToGallery } from '../utils/saveCameraImageToGallery';
 import type { ExtractedInvoiceData } from '../types';
+import { findDuplicateSaleForSave } from '../utils/receiptDuplicate';
 import {
   BORDER,
   CARD_BG,
@@ -265,23 +266,9 @@ export default function AddSaleScreen({
     }
   };
 
-  const save = async () => {
-    if (!extracted) return;
-    const ref = extracted.documentReference?.trim();
-    if (ref && currentBusiness) {
-      const normalizedRef = ref.toLowerCase();
-      const isDuplicate = sales.some(
-        (s) =>
-          s.businessId === currentBusiness.id &&
-          s.extracted.documentReference?.trim().toLowerCase() === normalizedRef
-      );
-      if (isDuplicate) {
-        Alert.alert('Duplicate sale', 'A sale with this reference has already been added.');
-        return;
-      }
-    }
+  const executeSave = async (extractedPayload: ExtractedInvoiceData) => {
     setStep('saving');
-    const extractedCategoryName = extracted.category?.trim();
+    const extractedCategoryName = extractedPayload.category?.trim();
     let resolvedCategoryId: string | null = categoryId;
     if (resolvedCategoryId == null && extractedCategoryName) {
       const matched = categories.find(
@@ -317,7 +304,7 @@ export default function AddSaleScreen({
         fileName: fileName || undefined,
         fileUri: undefined,
         fileUris: undefined,
-        extracted,
+        extracted: extractedPayload,
       });
 
       if (urisToUpload.length > 0 && user?.id) {
@@ -340,6 +327,32 @@ export default function AddSaleScreen({
       Alert.alert('Error', e instanceof Error ? e.message : 'Save failed.');
       setStep('edit');
     }
+  };
+
+  const save = async () => {
+    if (!extracted || !currentBusiness) return;
+    const dup = findDuplicateSaleForSave(sales, currentBusiness.id, extracted);
+    if (dup) {
+      const refText = extracted.documentReference?.trim();
+      const message =
+        dup.kind === 'reference' && refText
+          ? `A sale with reference “${refText}” is already in this business. You can still save and it will be marked as a duplicate.`
+          : `A sale with the same date, amount, and merchant may already be saved. You can still save and it will be marked as a duplicate.`;
+      Alert.alert('Possible duplicate', message, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Save as duplicate',
+          onPress: () =>
+            void executeSave({
+              ...extracted,
+              isDuplicate: true,
+              duplicateOfRecordId: dup.record.id,
+            }),
+        },
+      ]);
+      return;
+    }
+    await executeSave(extracted);
   };
 
   const acceptAndSave = () => {

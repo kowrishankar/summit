@@ -23,6 +23,7 @@ import {
   formatPrice,
 } from '../services/subscription';
 import * as teamAccess from '../services/teamAccess';
+import * as practiceHandoff from '../services/practiceHandoff';
 import type { AccountAccessInvite, AccountAccessMember } from '../types';
 import { createPortalSession } from '../services/stripeApi';
 import {
@@ -62,6 +63,8 @@ export default function SettingsScreen() {
   const [inviteBusy, setInviteBusy] = useState(false);
   const [acceptToken, setAcceptToken] = useState('');
   const [acceptBusy, setAcceptBusy] = useState(false);
+  const [claimHandoffToken, setClaimHandoffToken] = useState('');
+  const [claimHandoffBusy, setClaimHandoffBusy] = useState(false);
 
   const loadTeam = useCallback(async () => {
     if (!user?.id || isTeamMember) return;
@@ -183,6 +186,29 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleClaimHandoff = async () => {
+    const t = claimHandoffToken.trim();
+    if (!t) {
+      Alert.alert('Error', 'Paste the claim code from your accountant.');
+      return;
+    }
+    setClaimHandoffBusy(true);
+    try {
+      await practiceHandoff.claimBusinessHandoff(t);
+      setClaimHandoffToken('');
+      await refreshSubscription();
+      await reloadBusinessData();
+      Alert.alert(
+        'Business claimed',
+        'This workspace is now on your account. Your accountant still has access as a collaborator.'
+      );
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not claim business.');
+    } finally {
+      setClaimHandoffBusy(false);
+    }
+  };
+
   const handleAcceptInvite = async () => {
     const t = acceptToken.trim();
     if (!t) {
@@ -291,6 +317,42 @@ export default function SettingsScreen() {
               >
                 <Ionicons name="enter-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
                 <AppText style={styles.gradientBtnText}>{acceptBusy ? 'Accepting…' : 'Accept invite'}</AppText>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.card}>
+            <AppText style={styles.cardTitle}>Claim a business (from your accountant)</AppText>
+            <AppText style={styles.cardHint}>
+              If your accountant set up your business in Summit, sign in with the email they used for you, paste the
+              claim code they sent, then tap Claim. You’ll own the workspace; they keep access to help with tax and
+              books.
+            </AppText>
+            <TextInput
+              style={styles.input}
+              placeholder="Claim code"
+              value={claimHandoffToken}
+              onChangeText={setClaimHandoffToken}
+              placeholderTextColor={TEXT_MUTED}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => void handleClaimHandoff()}
+              disabled={claimHandoffBusy}
+              style={styles.gradientBtnTouchable}
+            >
+              <LinearGradient
+                colors={[PURPLE, PURPLE_DEEP]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.gradientBtn}
+              >
+                <Ionicons name="ribbon-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                <AppText style={styles.gradientBtnText}>
+                  {claimHandoffBusy ? 'Claiming…' : 'Claim business'}
+                </AppText>
               </LinearGradient>
             </TouchableOpacity>
           </View>

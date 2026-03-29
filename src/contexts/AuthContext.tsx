@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
-import type { User, Subscription } from '../types';
+import type { User, Subscription, AccountKind } from '../types';
 import * as supabaseAuth from '../services/supabaseAuth';
 import { addBusiness, setCurrentBusinessId } from '../services/supabaseData';
 import { hasActiveAccess, resolveBillingAndSubscription } from '../services/subscription';
@@ -18,8 +18,11 @@ interface AuthContextValue {
   signup: (
     email: string,
     password: string,
-    businessName?: string,
-    businessAddress?: string
+    options?: {
+      accountKind?: AccountKind;
+      businessName?: string;
+      businessAddress?: string;
+    }
   ) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ ok: boolean; token?: string; error?: string }>;
@@ -102,16 +105,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     async (
       email: string,
       password: string,
-      businessName?: string,
-      businessAddress?: string
+      options?: {
+        accountKind?: AccountKind;
+        businessName?: string;
+        businessAddress?: string;
+      }
     ) => {
       try {
-        const u = await supabaseAuth.signUp(email, password, businessName, businessAddress);
+        const kind = options?.accountKind ?? 'individual';
+        const u = await supabaseAuth.signUp(email, password, { accountKind: kind });
         setUser(u);
         if (u?.id) {
           await loadSubscription(u.id);
-          if (businessName?.trim()) {
-            await addBusiness(u.id, businessName.trim(), businessAddress?.trim());
+          const biz = options?.businessName?.trim();
+          if (biz && kind !== 'practice') {
+            await addBusiness(u.id, biz, options?.businessAddress?.trim());
             const businesses = await import('../services/supabaseData').then((m) =>
               m.getBusinessAccounts(u.id)
             );

@@ -128,6 +128,16 @@ export default function InvoiceDetailScreen({
     <>
       <Text style={styles.pullHint}>Swipe up for full details</Text>
 
+      {e.isDuplicate ? (
+        <View style={styles.duplicateBanner}>
+          <Ionicons name="copy-outline" size={20} color="#9A3412" style={styles.duplicateBannerIcon} />
+          <Text style={styles.duplicateBannerText}>
+            Marked as duplicate
+            {e.duplicateOfRecordId ? ' — linked to an earlier receipt in this business.' : '.'}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={styles.summaryCard}>
         <View style={styles.summaryTop}>
           <View style={[styles.typeBadge, { backgroundColor: INV_TILE }]}>
@@ -523,6 +533,24 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 16,
     textTransform: 'none',
+  },
+  duplicateBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF7ED',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  duplicateBannerIcon: { marginRight: 10, marginTop: 1 },
+  duplicateBannerText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#9A3412',
+    lineHeight: 20,
   },
   summaryCard: {
     backgroundColor: MUTED_CARD,

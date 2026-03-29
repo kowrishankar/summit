@@ -28,6 +28,10 @@ export interface ExtractedInvoiceData {
   ownedBy?: string;
   /** Document reference / invoice number */
   documentReference?: string;
+  /** Set when user saved despite a matching existing receipt (same ref or fingerprint). */
+  isDuplicate?: boolean;
+  /** Existing invoice/sale id this entry duplicates (for reference). */
+  duplicateOfRecordId?: string;
   lineItems: LineItem[];
 }
 
@@ -76,10 +80,14 @@ export interface BusinessAccount {
   updatedAt?: string;
 }
 
+/** Set at sign-up (stored in Supabase Auth user_metadata.account_kind). */
+export type AccountKind = 'individual' | 'business' | 'practice';
+
 export interface User {
   id: string;
   email: string;
   createdAt: string;
+  accountKind?: AccountKind;
 }
 
 /** Subscription status: trialing (free trial, card on file), active, cancelling, or cancelled (no access). */
@@ -138,5 +146,16 @@ export interface AccountAccessMember {
   ownerUserId: string;
   memberUserId: string;
   memberEmail: string | null;
+  createdAt: string;
+}
+
+/** Practice-created business waiting for the client to claim ownership. */
+export interface BusinessHandoffInvite {
+  id: string;
+  businessId: string;
+  practiceUserId: string;
+  invitedEmail: string;
+  token: string;
+  expiresAt: string;
   createdAt: string;
 }

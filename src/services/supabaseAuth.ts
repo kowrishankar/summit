@@ -1,16 +1,19 @@
 import { supabase } from '../lib/supabase';
-import type { User } from '../types';
+import type { AccountKind, User } from '../types';
 
 export async function signUp(
   email: string,
   password: string,
-  _businessName?: string,
-  _businessAddress?: string
+  options?: { accountKind?: AccountKind }
 ): Promise<User> {
+  const accountKind: AccountKind = options?.accountKind ?? 'individual';
   const { data, error } = await supabase.auth.signUp({
     email: email.trim(),
     password,
-    options: { emailRedirectTo: undefined },
+    options: {
+      emailRedirectTo: undefined,
+      data: { account_kind: accountKind },
+    },
   });
   if (error) throw new Error(error.message);
   if (!data.user) throw new Error('Signup failed');
@@ -82,10 +85,21 @@ export async function updatePassword(newPassword: string): Promise<{ ok: boolean
   return { ok: true };
 }
 
-function mapAuthUser(u: { id: string; email?: string }): User {
+function parseAccountKind(raw: unknown): AccountKind | undefined {
+  if (raw === 'individual' || raw === 'business' || raw === 'practice') return raw;
+  return undefined;
+}
+
+function mapAuthUser(u: {
+  id: string;
+  email?: string;
+  created_at?: string;
+  user_metadata?: Record<string, unknown>;
+}): User {
   return {
     id: u.id,
     email: u.email ?? '',
-    createdAt: new Date().toISOString(),
+    createdAt: u.created_at ?? new Date().toISOString(),
+    accountKind: parseAccountKind(u.user_metadata?.account_kind),
   };
 }

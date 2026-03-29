@@ -70,9 +70,16 @@ export default function SalesScreen({
           <Ionicons name="trending-up-outline" size={22} color={SALE_ICON} />
         </View>
         <View style={styles.rowMain}>
-          <Text style={styles.merchant} numberOfLines={1}>
-            {item.extracted.merchantName ?? item.extracted.ownedBy ?? 'Unknown'}
-          </Text>
+          <View style={styles.rowTitleLine}>
+            <Text style={styles.merchant} numberOfLines={1}>
+              {item.extracted.merchantName ?? item.extracted.ownedBy ?? 'Unknown'}
+            </Text>
+            {item.extracted.isDuplicate ? (
+              <View style={styles.dupPill}>
+                <Text style={styles.dupPillText}>Duplicate</Text>
+              </View>
+            ) : null}
+          </View>
           <Text style={styles.meta} numberOfLines={1}>
             {item.extracted.date ? format(new Date(item.extracted.date), 'EEE, d MMM yyyy') : '—'} ·{' '}
             {cat?.name ?? item.extracted.category ?? 'Uncategorised'}
@@ -235,7 +242,15 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   rowMain: { flex: 1, minWidth: 0 },
-  merchant: { fontSize: 16, fontWeight: '700', color: TEXT, textTransform: 'none' },
+  rowTitleLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  merchant: { fontSize: 16, fontWeight: '700', color: TEXT, textTransform: 'none', flexShrink: 1 },
+  dupPill: {
+    backgroundColor: '#FFEDD5',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  dupPillText: { fontSize: 10, fontWeight: '800', color: '#C2410C', textTransform: 'uppercase' },
   meta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4, textTransform: 'none' },
   rowAside: { alignItems: 'flex-end', marginLeft: 8 },
   amount: { fontSize: 16, fontWeight: '800', color: SALE_ICON, letterSpacing: -0.3, textTransform: 'none' },

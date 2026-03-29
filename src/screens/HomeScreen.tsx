@@ -64,6 +64,7 @@ interface ActivityRow {
   currency?: string;
   categoryLabel: string;
   verified: boolean;
+  isDuplicate?: boolean;
 }
 
 export default function HomeScreen({
@@ -77,6 +78,10 @@ export default function HomeScreen({
   const insets = useSafeAreaInsets();
   const { spendSummary, invoices, sales, currentBusiness, categories } = useApp();
   const { user } = useAuth();
+
+  const viewingSharedBusiness = Boolean(
+    currentBusiness && user && currentBusiness.userId !== user.id
+  );
   const { setPreferredAddType } = useAddPreferred();
 
   const primaryCurrency = useMemo(() => {
@@ -165,6 +170,7 @@ export default function HomeScreen({
         currency: inv.extracted.currency,
         categoryLabel: cat,
         verified: Boolean(merchant),
+        isDuplicate: inv.extracted.isDuplicate,
       });
     });
 
@@ -202,6 +208,7 @@ export default function HomeScreen({
         currency: s.extracted.currency,
         categoryLabel: cat,
         verified: Boolean(merchant),
+        isDuplicate: s.extracted.isDuplicate,
       });
     });
 
@@ -242,14 +249,9 @@ export default function HomeScreen({
     >
       {/* Header */}
       <View style={styles.headerRow}>
-        <TouchableOpacity
-          style={styles.headerTextWrap}
-          onPress={() => navigation.navigate('BusinessSwitch')}
-          activeOpacity={0.7}
-        >
+        <View style={styles.headerTextWrap}>
           <AppText style={styles.helloName}>Hello, {formatHelloName(user?.email)}</AppText>
-          <AppText style={styles.businessSub}>{currentBusiness?.name ?? 'No business'}</AppText>
-        </TouchableOpacity>
+        </View>
         <TouchableOpacity
           style={styles.giftBtn}
           onPress={() => Alert.alert('Summit', 'Rewards and tips are coming soon.')}
@@ -258,6 +260,41 @@ export default function HomeScreen({
           <Ionicons name="gift-outline" size={22} color={PRIMARY} />
         </TouchableOpacity>
       </View>
+
+      {viewingSharedBusiness && (
+        <View style={styles.sharedBusinessBanner}>
+          <Ionicons name="people-outline" size={22} color="#C2410C" style={styles.sharedBusinessBannerIcon} />
+          <View style={styles.sharedBusinessBannerTextCol}>
+            <AppText style={styles.sharedBusinessBannerTitle}>Shared business</AppText>
+            <AppText style={styles.sharedBusinessBannerBody}>
+              You’re viewing a business from another account (invited teammate). Invoices and sales here belong to
+              that workspace.
+            </AppText>
+          </View>
+        </View>
+      )}
+
+      <TouchableOpacity
+        style={styles.businessSwitchCard}
+        onPress={() => navigation.navigate('BusinessSwitch')}
+        activeOpacity={0.88}
+      >
+        <View style={styles.businessSwitchCardLeft}>
+          <AppText style={styles.businessSwitchLabel}>Current business</AppText>
+          <AppText style={styles.businessSwitchName} numberOfLines={2}>
+            {currentBusiness?.name ?? 'No business selected'}
+          </AppText>
+          {viewingSharedBusiness && (
+            <View style={styles.sharedPill}>
+              <AppText style={styles.sharedPillText}>Another account</AppText>
+            </View>
+          )}
+        </View>
+        <View style={styles.businessSwitchAction}>
+          <AppText style={styles.businessSwitchActionText}>Switch</AppText>
+          <Ionicons name="swap-horizontal-outline" size={22} color={PRIMARY} />
+        </View>
+      </TouchableOpacity>
 
       {/* Total balance card */}
       <TouchableOpacity
@@ -340,6 +377,11 @@ export default function HomeScreen({
                 <AppText style={styles.activityTitle} numberOfLines={2}>
                   {row.title}
                 </AppText>
+                {row.isDuplicate ? (
+                  <View style={styles.activityDupPill}>
+                    <AppText style={styles.activityDupPillText}>Dup</AppText>
+                  </View>
+                ) : null}
                 {row.verified ? (
                   <Ionicons name="checkmark-circle" size={18} color={GREEN} style={styles.verifiedCheck} />
                 ) : null}
@@ -375,7 +417,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: 12,
   },
   headerTextWrap: {
     flex: 1,
@@ -385,11 +427,80 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     color: TEXT,
+  },
+  sharedBusinessBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    backgroundColor: '#FFF7ED',
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#FDBA74',
+  },
+  sharedBusinessBannerIcon: { marginRight: 12, marginTop: 2 },
+  sharedBusinessBannerTextCol: { flex: 1 },
+  sharedBusinessBannerTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#9A3412',
     marginBottom: 4,
   },
-  businessSub: {
-    fontSize: 15,
+  sharedBusinessBannerBody: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#C2410C',
+    lineHeight: 18,
+  },
+  businessSwitchCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: CARD_BG,
+    borderRadius: 18,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
+  },
+  businessSwitchCardLeft: { flex: 1, paddingRight: 12 },
+  businessSwitchLabel: {
+    fontSize: 12,
+    fontWeight: '600',
     color: TEXT_MUTED,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginBottom: 4,
+  },
+  businessSwitchName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: TEXT,
+  },
+  sharedPill: {
+    alignSelf: 'flex-start',
+    marginTop: 8,
+    backgroundColor: '#FFEDD5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  sharedPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#C2410C',
+  },
+  businessSwitchAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  businessSwitchActionText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: PRIMARY,
   },
   giftBtn: {
     width: 44,
@@ -548,17 +659,26 @@ const styles = StyleSheet.create({
   },
   activityTitleRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 6,
   },
   activityTitle: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
     fontSize: 15,
     fontWeight: '600',
     color: TEXT,
   },
+  activityDupPill: {
+    backgroundColor: '#FFEDD5',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  activityDupPillText: { fontSize: 10, fontWeight: '800', color: '#C2410C' },
   verifiedCheck: {
-    marginLeft: 6,
-    marginTop: 1,
+    marginTop: 0,
   },
   activitySubtitle: {
     fontSize: 13,

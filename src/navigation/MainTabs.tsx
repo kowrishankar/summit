@@ -70,7 +70,11 @@ function HomeStack() {
         component={DashboardScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen name="BusinessSwitch" component={BusinessSwitchScreen} options={{ title: 'Switch business' }} />
+      <Stack.Screen
+        name="BusinessSwitch"
+        component={BusinessSwitchScreen}
+        options={{ title: 'Switch business', headerBackTitle: 'Home' }}
+      />
     </Stack.Navigator>
   );
 }

@@ -221,14 +221,17 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.accept_account_invite(TEXT) TO authenticated;
 
--- Prevent changing business owner via API (team members may update name/address)
+-- Prevent changing business owner via API (team members may update name/address).
+-- claim_business_handoff sets app.allow_business_owner_transfer = 1 for the transaction only.
 CREATE OR REPLACE FUNCTION public.prevent_business_user_id_change()
 RETURNS TRIGGER
 LANGUAGE plpgsql
 AS $$
 BEGIN
   IF NEW.user_id IS DISTINCT FROM OLD.user_id THEN
-    RAISE EXCEPTION 'Cannot change business owner';
+    IF COALESCE(current_setting('app.allow_business_owner_transfer', true), '') <> '1' THEN
+      RAISE EXCEPTION 'Cannot change business owner';
+    END IF;
   END IF;
   RETURN NEW;
 END;
@@ -375,6 +378,110 @@ CREATE POLICY "Users delete own subscription"
   ON subscriptions FOR DELETE
   USING (user_id = auth.uid());
 ```
+
+### Practice / accountant: hand off a business to a client
+
+Lets an **accountant (practice)** create a business, then send a **claim code** to the business owner’s email. The owner signs up or signs in with that email, enters the code in Settings, and becomes the business owner; the practice stays linked as a **team member** so they can keep switching between clients for year‑end work.
+
+Run **after** the team-access migration above. If you skipped the team block, run the `prevent_business_user_id_change` function from that section first (with `app.allow_business_owner_transfer`), then run this.
+
+```sql
+-- Trigger (idempotent): same as team section — allows claim_business_handoff to transfer user_id
+CREATE OR REPLACE FUNCTION public.prevent_business_user_id_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.user_id IS DISTINCT FROM OLD.user_id THEN
+    IF COALESCE(current_setting('app.allow_business_owner_transfer', true), '') <> '1' THEN
+      RAISE EXCEPTION 'Cannot change business owner';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+CREATE TABLE IF NOT EXISTS business_handoff_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID NOT NULL REFERENCES business_accounts(id) ON DELETE CASCADE,
+  practice_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  invited_email TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS business_handoff_invites_practice ON business_handoff_invites (practice_user_id);
+CREATE INDEX IF NOT EXISTS business_handoff_invites_business ON business_handoff_invites (business_id);
+
+ALTER TABLE business_handoff_invites ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Practice sees own handoffs" ON business_handoff_invites;
+CREATE POLICY "Practice sees own handoffs"
+  ON business_handoff_invites FOR SELECT
+  USING (practice_user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Practice creates handoffs" ON business_handoff_invites;
+CREATE POLICY "Practice creates handoffs"
+  ON business_handoff_invites FOR INSERT
+  WITH CHECK (
+    practice_user_id = auth.uid()
+    AND business_id IN (SELECT id FROM business_accounts WHERE user_id = auth.uid())
+  );
+
+DROP POLICY IF EXISTS "Practice deletes own handoffs" ON business_handoff_invites;
+CREATE POLICY "Practice deletes own handoffs"
+  ON business_handoff_invites FOR DELETE
+  USING (practice_user_id = auth.uid());
+
+CREATE OR REPLACE FUNCTION public.claim_business_handoff(invite_token text)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  inv business_handoff_invites%ROWTYPE;
+  em TEXT;
+BEGIN
+  SELECT * INTO inv FROM business_handoff_invites
+  WHERE token = invite_token AND expires_at > now();
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'invalid_or_expired_handoff';
+  END IF;
+
+  SELECT lower(trim(email)) INTO em FROM auth.users WHERE id = auth.uid();
+  IF em IS NULL OR lower(trim(inv.invited_email)) <> em THEN
+    RAISE EXCEPTION 'email_mismatch';
+  END IF;
+
+  IF inv.practice_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'cannot_claim_own_handoff';
+  END IF;
+
+  PERFORM set_config('app.allow_business_owner_transfer', '1', true);
+
+  UPDATE business_accounts
+  SET user_id = auth.uid(), updated_at = now()
+  WHERE id = inv.business_id;
+
+  INSERT INTO account_access_members (owner_user_id, member_user_id, member_email)
+  VALUES (
+    auth.uid(),
+    inv.practice_user_id,
+    (SELECT email FROM auth.users WHERE id = inv.practice_user_id)
+  )
+  ON CONFLICT (owner_user_id, member_user_id) DO UPDATE
+  SET member_email = EXCLUDED.member_email;
+
+  DELETE FROM business_handoff_invites WHERE id = inv.id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.claim_business_handoff(text) TO authenticated;
+```
+
+**Auth metadata (optional but recommended):** the app stores `account_kind` on sign-up (`individual`, `business`, or `practice`) in the user’s **raw user metadata** via `signUp({ options: { data: { account_kind: '...' } } })`. No extra table is required.
 
 ### Already created `subscriptions` without `trialing`?
 
