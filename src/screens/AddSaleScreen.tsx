@@ -30,6 +30,7 @@ import { formatAmount } from '../utils/currency';
 import { maybeSaveCameraImageToGallery } from '../utils/saveCameraImageToGallery';
 import { placeholderProcessingExtracted, placeholderFailedExtracted } from '../utils/placeholderReceipt';
 import type { ExtractedInvoiceData } from '../types';
+import { displayIssuedBy, displayIssuedTo } from '../utils/extractedParties';
 import { findDuplicateSaleForSave } from '../utils/receiptDuplicate';
 import { resolveCategoryIdForSave } from '../services/categoryResolution';
 import { pdfFirstPageAsImageAsset } from '../utils/appendPdfFirstPageAsImageSection';
@@ -74,7 +75,7 @@ export default function AddSaleScreen({
   } = useApp();
   const { addPendingExtracting, updatePending, removePending, items: pendingItems } = usePendingExtraction();
   const [step, setStep] = useState<
-    'choose' | 'preview' | 'extracting' | 'review' | 'edit' | 'saving' | 'done'
+    'choose' | 'preview' | 'submitting' | 'extracting' | 'review' | 'edit' | 'saving' | 'done'
   >('choose');
   const [extracted, setExtracted] = useState<ExtractedInvoiceData | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -88,14 +89,9 @@ export default function AddSaleScreen({
   const [previewZoomVisible, setPreviewZoomVisible] = useState(false);
   const [previewZoomIndex, setPreviewZoomIndex] = useState(0);
 
-  const extractionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const backgroundedExtractionRef = useRef(false);
   const pendingSessionIdRef = useRef<string | null>(null);
   const draftSaleIdRef = useRef<string | null>(null);
   const backgroundDbRecordIdRef = useRef<string | null>(null);
-  const extractionStashRef = useRef<
-    { kind: 'success'; data: ExtractedInvoiceData } | { kind: 'error'; message: string } | null
-  >(null);
 
   const goToDashboardHome = useCallback(() => {
     const tabNav = nav.getParent?.();
@@ -103,12 +99,6 @@ export default function AddSaleScreen({
       screen: 'HomeMain',
     });
   }, [nav]);
-
-  useEffect(() => {
-    return () => {
-      if (extractionTimeoutRef.current) clearTimeout(extractionTimeoutRef.current);
-    };
-  }, []);
 
   const routeRecordId =
     (route.params as { pendingId?: string; recordId?: string } | undefined)?.pendingId ??
@@ -421,7 +411,6 @@ export default function AddSaleScreen({
     draftSaleIdRef.current = null;
     pendingSessionIdRef.current = null;
     backgroundDbRecordIdRef.current = null;
-    extractionStashRef.current = null;
     setStep('choose');
     setDocumentUri(null);
     setFileName('');
@@ -461,128 +450,75 @@ export default function AddSaleScreen({
         ? [fileUriToSave]
         : [];
 
-    backgroundedExtractionRef.current = false;
     backgroundDbRecordIdRef.current = null;
-    extractionStashRef.current = null;
     draftSaleIdRef.current = null;
 
-    if (extractionTimeoutRef.current) clearTimeout(extractionTimeoutRef.current);
-    extractionTimeoutRef.current = setTimeout(() => {
-      void (async () => {
-        try {
-          backgroundedExtractionRef.current = true;
-          const placeholder = placeholderProcessingExtracted();
-          const newSale = await addSale({
-            businessId: '',
-            categoryId: null,
-            source: 'upload',
-            fileName: snapshot.fileName,
-            fileUri: undefined,
-            fileUris: undefined,
-            extracted: placeholder,
-            reviewStatus: 'processing',
-          });
-          const recordId = newSale.id;
-          backgroundDbRecordIdRef.current = recordId;
-          draftSaleIdRef.current = recordId;
-          pendingSessionIdRef.current = recordId;
-
-          if (urisToUpload.length > 0 && user?.id) {
-            const isPdfUpload = snapshot.fileName.toLowerCase().endsWith('.pdf');
-            const urls = await uploadAttachments(
-              user.id,
-              'sales',
-              recordId,
-              urisToUpload,
-              isPdfUpload
-            );
-            await updateSale(recordId, {
-              fileUri: urls[0],
-              fileUris: urls.length > 1 ? urls : undefined,
-            });
-          }
-
-          addPendingExtracting({
-            id: recordId,
-            kind: 'sale',
-            fileName: snapshot.fileName,
-            isPdf: snapshot.isPdf,
-            documentUri: snapshot.documentUri,
-            imageAssets: snapshot.imageAssets,
-          });
-
-          const stashed = extractionStashRef.current;
-          extractionStashRef.current = null;
-          if (stashed?.kind === 'success') {
-            await updateSale(recordId, {
-              extracted: stashed.data,
-              reviewStatus: 'pending_review',
-            });
-            updatePending(recordId, { status: 'ready', extracted: stashed.data });
-          } else if (stashed?.kind === 'error') {
-            await updateSale(recordId, {
-              extracted: placeholderFailedExtracted(),
-              reviewStatus: 'failed',
-            });
-            updatePending(recordId, { status: 'error', errorMessage: stashed.message });
-          }
-
-          Alert.alert(
-            'Working in the background',
-            'We’re still reading your document. You can review it from Home when it’s ready — it’s also saved in your Sales list until you confirm.'
-          );
-          goToDashboardHome();
-        } catch (err) {
-          backgroundedExtractionRef.current = false;
-          Alert.alert(
-            'Could not save draft',
-            err instanceof Error ? err.message : 'Please try again.'
-          );
-          setStep('preview');
-        }
-      })();
-    }, 2_000);
-
-    setStep('extracting');
+    setStep('submitting');
     try {
-      const data = await runReceiptExtraction(snapshot, 'sale');
-      if (extractionTimeoutRef.current) {
-        clearTimeout(extractionTimeoutRef.current);
-        extractionTimeoutRef.current = null;
+      const placeholder = placeholderProcessingExtracted();
+      const newSale = await addSale({
+        businessId: '',
+        categoryId: null,
+        source: 'upload',
+        fileName: snapshot.fileName,
+        fileUri: undefined,
+        fileUris: undefined,
+        extracted: placeholder,
+        reviewStatus: 'processing',
+      });
+      const recordId = newSale.id;
+      backgroundDbRecordIdRef.current = recordId;
+      draftSaleIdRef.current = recordId;
+      pendingSessionIdRef.current = recordId;
+
+      if (urisToUpload.length > 0 && user?.id) {
+        const isPdfUpload = snapshot.fileName.toLowerCase().endsWith('.pdf');
+        const urls = await uploadAttachments(
+          user.id,
+          'sales',
+          recordId,
+          urisToUpload,
+          isPdfUpload
+        );
+        await updateSale(recordId, {
+          fileUri: urls[0],
+          fileUris: urls.length > 1 ? urls : undefined,
+        });
       }
-      if (backgroundedExtractionRef.current) {
-        const dbId = backgroundDbRecordIdRef.current;
-        if (dbId) {
-          await updateSale(dbId, { extracted: data, reviewStatus: 'pending_review' });
-          updatePending(dbId, { status: 'ready', extracted: data });
-        } else {
-          extractionStashRef.current = { kind: 'success', data };
-        }
-      } else {
-        setExtracted(data);
-        setStep('review');
-      }
-    } catch (e) {
-      if (extractionTimeoutRef.current) {
-        clearTimeout(extractionTimeoutRef.current);
-        extractionTimeoutRef.current = null;
-      }
-      const msg = e instanceof Error ? e.message : 'Extraction failed.';
-      if (backgroundedExtractionRef.current) {
-        const dbId = backgroundDbRecordIdRef.current;
-        if (dbId) {
-          await updateSale(dbId, {
+
+      addPendingExtracting({
+        id: recordId,
+        kind: 'sale',
+        fileName: snapshot.fileName,
+        isPdf: snapshot.isPdf,
+        documentUri: snapshot.documentUri,
+        imageAssets: snapshot.imageAssets,
+      });
+
+      void runReceiptExtraction(snapshot, 'sale')
+        .then(async (data) => {
+          await updateSale(recordId, {
+            extracted: data,
+            reviewStatus: 'pending_review',
+          });
+          updatePending(recordId, { status: 'ready', extracted: data });
+        })
+        .catch(async (e) => {
+          const msg = e instanceof Error ? e.message : 'Extraction failed.';
+          await updateSale(recordId, {
             extracted: placeholderFailedExtracted(),
             reviewStatus: 'failed',
           });
-          updatePending(dbId, { status: 'error', errorMessage: msg });
-        } else {
-          extractionStashRef.current = { kind: 'error', message: msg };
-        }
-      } else {
-        Alert.alert('Error', msg);
-        setStep('preview');
-      }
+          updatePending(recordId, { status: 'error', errorMessage: msg });
+        });
+
+      goToDashboardHome();
+    } catch (err) {
+      Alert.alert(
+        'Could not save draft',
+        err instanceof Error ? err.message : 'Please try again.'
+      );
+      setStep('preview');
     }
   };
 
@@ -709,7 +645,6 @@ export default function AddSaleScreen({
                 pendingSessionIdRef.current = null;
                 draftSaleIdRef.current = null;
                 backgroundDbRecordIdRef.current = null;
-                extractionStashRef.current = null;
               }
               finishAndLeave();
             })(),
@@ -741,7 +676,6 @@ export default function AddSaleScreen({
     draftSaleIdRef.current = null;
     pendingSessionIdRef.current = null;
     backgroundDbRecordIdRef.current = null;
-    extractionStashRef.current = null;
     setStep('choose');
     setExtracted(null);
     setCategoryId(null);
@@ -783,7 +717,6 @@ export default function AddSaleScreen({
               pendingSessionIdRef.current = null;
               draftSaleIdRef.current = null;
               backgroundDbRecordIdRef.current = null;
-              extractionStashRef.current = null;
               finishAndLeave();
             })(),
         },
@@ -962,6 +895,18 @@ export default function AddSaleScreen({
     );
   }
 
+  if (step === 'submitting') {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <View style={styles.extractingCard}>
+          <ActivityIndicator size="large" color={PRIMARY} />
+          <Text style={styles.extractingTitle}>Processing</Text>
+          <Text style={styles.extractingSub}>Saving your sale and sending it to be read…</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (step === 'extracting') {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -1000,8 +945,10 @@ export default function AddSaleScreen({
           </View>
         )}
         <View style={styles.reviewSummary}>
-          <Text style={styles.summaryLabel}>Merchant</Text>
-          <Text style={styles.reviewMerchant}>{extracted.merchantName ?? '—'}</Text>
+          <Text style={styles.summaryLabel}>Issued by</Text>
+          <Text style={styles.reviewMerchant}>{displayIssuedBy(extracted) ?? '—'}</Text>
+          <Text style={styles.summaryLabel}>Issued to</Text>
+          <Text style={styles.reviewMerchant}>{displayIssuedTo(extracted) ?? '—'}</Text>
           <Text style={styles.summaryLabel}>Amount</Text>
           <Text style={styles.reviewAmountIncome}>
             {formatAmount(extracted.amount ?? 0, extracted.currency)}
@@ -1060,12 +1007,30 @@ export default function AddSaleScreen({
             <Text style={styles.docLabel}>{fileName}</Text>
           </View>
         )}
-        <Text style={styles.fieldLabel}>Merchant</Text>
+        <Text style={styles.fieldLabel}>Issued by</Text>
         <TextInput
           style={styles.input}
-          placeholder="Merchant name"
-          value={extracted.merchantName ?? ''}
-          onChangeText={(t) => updateField('merchantName', t || undefined)}
+          placeholder="Seller / business on the receipt"
+          value={displayIssuedBy(extracted) ?? ''}
+          onChangeText={(t) => {
+            const v = t || undefined;
+            setExtracted((prev) =>
+              prev ? { ...prev, issuedBy: v, merchantName: v } : null
+            );
+          }}
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <Text style={styles.fieldLabel}>Issued to</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Customer / buyer (if shown)"
+          value={displayIssuedTo(extracted) ?? ''}
+          onChangeText={(t) => {
+            const v = t || undefined;
+            setExtracted((prev) =>
+              prev ? { ...prev, issuedTo: v, ownedBy: v } : null
+            );
+          }}
           placeholderTextColor={TEXT_MUTED}
         />
         <Text style={styles.fieldLabel}>Amount</Text>
@@ -1162,7 +1127,7 @@ export default function AddSaleScreen({
           </LinearGradient>
           <Text style={styles.doneTitle}>Sale saved</Text>
           <Text style={styles.doneSubtitle}>
-            {extracted.merchantName ?? 'Sale'} · {formatAmount(extracted.amount ?? 0, extracted.currency)}
+            {displayIssuedBy(extracted) ?? 'Sale'} · {formatAmount(extracted.amount ?? 0, extracted.currency)}
           </Text>
         </View>
         <TouchableOpacity style={styles.gradientBtnWrap} onPress={finishAndLeave} activeOpacity={0.92}>

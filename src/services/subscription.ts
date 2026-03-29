@@ -1,8 +1,10 @@
 import type { Subscription } from '../types';
+import { PLAN_AMOUNT_PENCE, PERSONAL_MAX_INVOICES, PERSONAL_MAX_SALES } from '../config/pricing';
 import * as supabaseData from './supabaseData';
 
-const MONTHLY_PRICE_PENCE = 1499;
 const CURRENCY = 'GBP';
+/** Default Personal tier amount (pence); prefer `PLAN_AMOUNT_PENCE` / per-tier pricing in UI. */
+const MONTHLY_PRICE_PENCE = PLAN_AMOUNT_PENCE.individual;
 
 /** Whether the user has access (active or cancelled but still within paid period). */
 export function hasActiveAccess(sub: Subscription | null): boolean {
@@ -79,6 +81,8 @@ export async function createSubscriptionFromStripe(
     stripeSubscriptionId?: string;
     stripeCustomerId?: string;
     status?: 'active' | 'trialing';
+    /** Tier price to store (pence); defaults to Personal plan. */
+    amountPence?: number;
   }
 ): Promise<Subscription> {
   return supabaseData.upsertSubscriptionFromStripe(userId, params);
@@ -95,4 +99,10 @@ export function formatPrice(sub: Subscription): string {
   return sub.currency === 'GBP' ? `£${amount}` : `${sub.currency} ${amount}`;
 }
 
-export { MONTHLY_PRICE_PENCE, CURRENCY };
+export {
+  MONTHLY_PRICE_PENCE,
+  CURRENCY,
+  PLAN_AMOUNT_PENCE,
+  PERSONAL_MAX_INVOICES,
+  PERSONAL_MAX_SALES,
+};

@@ -77,8 +77,10 @@ export function inferCategoryLabelFromExtracted(
   docKind: 'invoice' | 'sale'
 ): string | null {
   const parts = [
+    extracted.issuedBy,
     extracted.merchantName,
     extracted.supplierName,
+    extracted.issuedTo,
     ...extracted.lineItems.map((l) => l.description),
   ]
     .filter((x): x is string => Boolean(x && String(x).trim()))
@@ -99,7 +101,7 @@ async function suggestCategoryWithOpenAI(
   const openai = getOpenAIClient();
   if (!openai) return null;
   const payload = {
-    merchant: extracted.merchantName ?? extracted.supplierName ?? null,
+    merchant: extracted.issuedBy ?? extracted.merchantName ?? extracted.supplierName ?? null,
     lineDescriptions: extracted.lineItems.slice(0, 12).map((l) => l.description),
     existingCategoryNames: categoryNames,
   };

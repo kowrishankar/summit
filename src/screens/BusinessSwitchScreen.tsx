@@ -7,13 +7,20 @@ import {
   Modal,
   Alert,
   SectionList,
+  Platform,
+  ActivityIndicator,
 } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useStripe } from '@stripe/stripe-react-native';
 import AppText from '../components/AppText';
+import { PLAN_AMOUNT_PENCE } from '../config/pricing';
+import { isStripePublishableKeyConfigured } from '../config/stripeEnv';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import * as practiceHandoff from '../services/practiceHandoff';
+import * as supabaseData from '../services/supabaseData';
+import { prepareSubscriptionPayment, confirmSubscription } from '../services/stripeApi';
 import type { BusinessAccount } from '../types';
 import {
   BORDER,
@@ -35,7 +42,9 @@ export default function BusinessSwitchScreen({
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
   const { businesses, currentBusiness, switchBusiness, addBusiness, reloadBusinessData } = useApp();
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [modalVisible, setModalVisible] = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
   const [newName, setNewName] = useState('');
   const [clientEmail, setClientEmail] = useState('');
   const [clientAddress, setClientAddress] = useState('');
@@ -102,6 +111,105 @@ export default function BusinessSwitchScreen({
           return;
         }
         if (!user?.id) return;
+
+        const owned = businesses.filter((b) => b.userId === user.id);
+        const needsAdditionalSubscription = owned.length >= 1;
+
+        if (needsAdditionalSubscription) {
+          if (Platform.OS === 'web') {
+            Alert.alert(
+              'Use the app',
+              'Adding another client workspace requires payment. Open Summit on iOS or Android.'
+            );
+            return;
+          }
+          if (!isStripePublishableKeyConfigured()) {
+            Alert.alert('Payment not configured', 'This build does not include Stripe keys.');
+            return;
+          }
+          if (!user.email) {
+            Alert.alert('Error', 'Your account email is required for billing.');
+            return;
+          }
+          setPayLoading(true);
+          const returnURL = 'summit://stripe-redirect';
+          const subResponse = await prepareSubscriptionPayment(user.email, {
+            accountKind: 'practice',
+            additionalPracticeSlot: true,
+          });
+          if (subResponse.status === 'requires_payment' && subResponse.clientSecret) {
+            const { error: initError } = await initPaymentSheet({
+              paymentIntentClientSecret: subResponse.clientSecret,
+              merchantDisplayName: 'Summit',
+              returnURL,
+            });
+            if (initError) {
+              Alert.alert('Error', initError.message ?? 'Could not initialize payment.');
+              return;
+            }
+            const { error: presentError } = await presentPaymentSheet();
+            if (presentError) {
+              if (presentError.code !== 'Canceled') {
+                Alert.alert('Payment failed', presentError.message ?? 'Payment failed.');
+              }
+              return;
+            }
+            await new Promise((r) => setTimeout(r, 800));
+          }
+          const confirmed = await confirmSubscription(subResponse.subscriptionId);
+          const currentPeriodEnd =
+            confirmed.currentPeriodEnd ??
+            subResponse.currentPeriodEnd ??
+            new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+          const { business, invite } = await practiceHandoff.createClientBusinessWithHandoff(
+            user.id,
+            newName.trim(),
+            em,
+            clientAddress.trim() || undefined
+          );
+          try {
+            await supabaseData.insertPracticeSubscriptionAddon({
+              userId: user.id,
+              businessId: business.id,
+              stripeSubscriptionId: subResponse.subscriptionId,
+              amountPence: PLAN_AMOUNT_PENCE.practice,
+              status: confirmed.status,
+              currentPeriodEnd,
+            });
+          } catch (addonErr) {
+            console.warn('[BusinessSwitch] practice_subscription_addons', addonErr);
+            Alert.alert(
+              'Subscription note',
+              'Payment succeeded, but we could not save the add-on record. Check docs/SUPABASE-SETUP.md for the practice_subscription_addons table, or contact support.'
+            );
+          }
+
+          setNewName('');
+          setClientEmail('');
+          setClientAddress('');
+          setModalVisible(false);
+          await reloadBusinessData();
+          await loadHandoffs();
+          const token = invite.token;
+          const body = `Email or message ${em} with this code. They sign up with that email and choose “Invited by Practice, or use Settings → Claim a business—no separate Summit payment.\n\n${token}`;
+          Alert.alert('Send claim code to client', body, [
+            {
+              text: 'Copy code',
+              onPress: async () => {
+                try {
+                  await Clipboard.setStringAsync(token);
+                  Alert.alert('Copied', 'Claim code copied to clipboard.');
+                } catch {
+                  Alert.alert('Copy failed', 'Copy the code from the message above.');
+                }
+              },
+            },
+            { text: 'OK', style: 'cancel' },
+          ]);
+          return;
+        }
+
         const { invite } = await practiceHandoff.createClientBusinessWithHandoff(
           user.id,
           newName.trim(),
@@ -137,6 +245,8 @@ export default function BusinessSwitchScreen({
       }
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Failed to add business');
+    } finally {
+      setPayLoading(false);
     }
   };
 
@@ -204,6 +314,11 @@ export default function BusinessSwitchScreen({
             {isPractice && (
               <AppText style={styles.modalHint}>
                 The client’s email must match the account they use to claim. You’ll get a code to send them.
+                {user?.id &&
+                businesses.filter((b) => b.userId === user.id).length >= 1 &&
+                Platform.OS !== 'web'
+                  ? ` Each additional workspace after your first is £${(PLAN_AMOUNT_PENCE.practice / 100).toFixed(2)}/month.`
+                  : ''}
               </AppText>
             )}
             <TextInput
@@ -237,8 +352,16 @@ export default function BusinessSwitchScreen({
               <TouchableOpacity style={styles.modalBtn} onPress={() => setModalVisible(false)}>
                 <AppText style={styles.modalBtnText}>Cancel</AppText>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.modalBtn, styles.modalBtnPrimary]} onPress={() => void handleAdd()}>
-                <AppText style={styles.modalBtnTextPrimary}>{isPractice ? 'Create & get code' : 'Add'}</AppText>
+              <TouchableOpacity
+                style={[styles.modalBtn, styles.modalBtnPrimary]}
+                onPress={() => void handleAdd()}
+                disabled={payLoading}
+              >
+                {payLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <AppText style={styles.modalBtnTextPrimary}>{isPractice ? 'Create & get code' : 'Add'}</AppText>
+                )}
               </TouchableOpacity>
             </View>
           </View>

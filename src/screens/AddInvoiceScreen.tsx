@@ -30,6 +30,7 @@ import { formatAmount } from '../utils/currency';
 import { maybeSaveCameraImageToGallery } from '../utils/saveCameraImageToGallery';
 import { placeholderProcessingExtracted, placeholderFailedExtracted } from '../utils/placeholderReceipt';
 import type { ExtractedInvoiceData } from '../types';
+import { displayIssuedBy, displayIssuedTo } from '../utils/extractedParties';
 import { findDuplicateInvoiceForSave } from '../utils/receiptDuplicate';
 import { resolveCategoryIdForSave } from '../services/categoryResolution';
 import { pdfFirstPageAsImageAsset } from '../utils/appendPdfFirstPageAsImageSection';
@@ -74,7 +75,7 @@ export default function AddInvoiceScreen({
   } = useApp();
   const { addPendingExtracting, updatePending, removePending, items: pendingItems } = usePendingExtraction();
   const [step, setStep] = useState<
-    'choose' | 'preview' | 'extracting' | 'review' | 'edit' | 'saving' | 'done'
+    'choose' | 'preview' | 'submitting' | 'extracting' | 'review' | 'edit' | 'saving' | 'done'
   >('choose');
   const [extracted, setExtracted] = useState<ExtractedInvoiceData | null>(null);
   const [categoryId, setCategoryId] = useState<string | null>(null);
@@ -88,15 +89,10 @@ export default function AddInvoiceScreen({
   const [previewZoomVisible, setPreviewZoomVisible] = useState(false);
   const [previewZoomIndex, setPreviewZoomIndex] = useState(0);
 
-  const extractionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const backgroundedExtractionRef = useRef(false);
   const pendingSessionIdRef = useRef<string | null>(null);
   /** DB row id for background / draft invoice (same as pending context id when persisted). */
   const draftInvoiceIdRef = useRef<string | null>(null);
   const backgroundDbRecordIdRef = useRef<string | null>(null);
-  const extractionStashRef = useRef<
-    { kind: 'success'; data: ExtractedInvoiceData } | { kind: 'error'; message: string } | null
-  >(null);
 
   const goToDashboardHome = useCallback(() => {
     const tabNav = nav.getParent?.();
@@ -104,12 +100,6 @@ export default function AddInvoiceScreen({
       screen: 'HomeMain',
     });
   }, [nav]);
-
-  useEffect(() => {
-    return () => {
-      if (extractionTimeoutRef.current) clearTimeout(extractionTimeoutRef.current);
-    };
-  }, []);
 
   const routeRecordId =
     (route.params as { pendingId?: string; recordId?: string } | undefined)?.pendingId ??
@@ -422,7 +412,6 @@ export default function AddInvoiceScreen({
     draftInvoiceIdRef.current = null;
     pendingSessionIdRef.current = null;
     backgroundDbRecordIdRef.current = null;
-    extractionStashRef.current = null;
     setStep('choose');
     setDocumentUri(null);
     setFileName('');
@@ -462,128 +451,75 @@ export default function AddInvoiceScreen({
         ? [fileUriToSave]
         : [];
 
-    backgroundedExtractionRef.current = false;
     backgroundDbRecordIdRef.current = null;
-    extractionStashRef.current = null;
     draftInvoiceIdRef.current = null;
 
-    if (extractionTimeoutRef.current) clearTimeout(extractionTimeoutRef.current);
-    extractionTimeoutRef.current = setTimeout(() => {
-      void (async () => {
-        try {
-          backgroundedExtractionRef.current = true;
-          const placeholder = placeholderProcessingExtracted();
-          const newInvoice = await addInvoice({
-            businessId: '',
-            categoryId: null,
-            source: 'upload',
-            fileName: snapshot.fileName,
-            fileUri: undefined,
-            fileUris: undefined,
-            extracted: placeholder,
-            reviewStatus: 'processing',
-          });
-          const recordId = newInvoice.id;
-          backgroundDbRecordIdRef.current = recordId;
-          draftInvoiceIdRef.current = recordId;
-          pendingSessionIdRef.current = recordId;
-
-          if (urisToUpload.length > 0 && user?.id) {
-            const isPdfUpload = snapshot.fileName.toLowerCase().endsWith('.pdf');
-            const urls = await uploadAttachments(
-              user.id,
-              'invoices',
-              recordId,
-              urisToUpload,
-              isPdfUpload
-            );
-            await updateInvoice(recordId, {
-              fileUri: urls[0],
-              fileUris: urls.length > 1 ? urls : undefined,
-            });
-          }
-
-          addPendingExtracting({
-            id: recordId,
-            kind: 'invoice',
-            fileName: snapshot.fileName,
-            isPdf: snapshot.isPdf,
-            documentUri: snapshot.documentUri,
-            imageAssets: snapshot.imageAssets,
-          });
-
-          const stashed = extractionStashRef.current;
-          extractionStashRef.current = null;
-          if (stashed?.kind === 'success') {
-            await updateInvoice(recordId, {
-              extracted: stashed.data,
-              reviewStatus: 'pending_review',
-            });
-            updatePending(recordId, { status: 'ready', extracted: stashed.data });
-          } else if (stashed?.kind === 'error') {
-            await updateInvoice(recordId, {
-              extracted: placeholderFailedExtracted(),
-              reviewStatus: 'failed',
-            });
-            updatePending(recordId, { status: 'error', errorMessage: stashed.message });
-          }
-
-          Alert.alert(
-            'Working in the background',
-            'We’re still reading your receipt. You can review it from Home when it’s ready — it’s also saved in your Invoices list until you confirm.'
-          );
-          goToDashboardHome();
-        } catch (err) {
-          backgroundedExtractionRef.current = false;
-          Alert.alert(
-            'Could not save draft',
-            err instanceof Error ? err.message : 'Please try again.'
-          );
-          setStep('preview');
-        }
-      })();
-    }, 2_000);
-
-    setStep('extracting');
+    setStep('submitting');
     try {
-      const data = await runReceiptExtraction(snapshot, 'invoice');
-      if (extractionTimeoutRef.current) {
-        clearTimeout(extractionTimeoutRef.current);
-        extractionTimeoutRef.current = null;
+      const placeholder = placeholderProcessingExtracted();
+      const newInvoice = await addInvoice({
+        businessId: '',
+        categoryId: null,
+        source: 'upload',
+        fileName: snapshot.fileName,
+        fileUri: undefined,
+        fileUris: undefined,
+        extracted: placeholder,
+        reviewStatus: 'processing',
+      });
+      const recordId = newInvoice.id;
+      backgroundDbRecordIdRef.current = recordId;
+      draftInvoiceIdRef.current = recordId;
+      pendingSessionIdRef.current = recordId;
+
+      if (urisToUpload.length > 0 && user?.id) {
+        const isPdfUpload = snapshot.fileName.toLowerCase().endsWith('.pdf');
+        const urls = await uploadAttachments(
+          user.id,
+          'invoices',
+          recordId,
+          urisToUpload,
+          isPdfUpload
+        );
+        await updateInvoice(recordId, {
+          fileUri: urls[0],
+          fileUris: urls.length > 1 ? urls : undefined,
+        });
       }
-      if (backgroundedExtractionRef.current) {
-        const dbId = backgroundDbRecordIdRef.current;
-        if (dbId) {
-          await updateInvoice(dbId, { extracted: data, reviewStatus: 'pending_review' });
-          updatePending(dbId, { status: 'ready', extracted: data });
-        } else {
-          extractionStashRef.current = { kind: 'success', data };
-        }
-      } else {
-        setExtracted(data);
-        setStep('review');
-      }
-    } catch (e) {
-      if (extractionTimeoutRef.current) {
-        clearTimeout(extractionTimeoutRef.current);
-        extractionTimeoutRef.current = null;
-      }
-      const msg = e instanceof Error ? e.message : 'Extraction failed.';
-      if (backgroundedExtractionRef.current) {
-        const dbId = backgroundDbRecordIdRef.current;
-        if (dbId) {
-          await updateInvoice(dbId, {
+
+      addPendingExtracting({
+        id: recordId,
+        kind: 'invoice',
+        fileName: snapshot.fileName,
+        isPdf: snapshot.isPdf,
+        documentUri: snapshot.documentUri,
+        imageAssets: snapshot.imageAssets,
+      });
+
+      void runReceiptExtraction(snapshot, 'invoice')
+        .then(async (data) => {
+          await updateInvoice(recordId, {
+            extracted: data,
+            reviewStatus: 'pending_review',
+          });
+          updatePending(recordId, { status: 'ready', extracted: data });
+        })
+        .catch(async (e) => {
+          const msg = e instanceof Error ? e.message : 'Extraction failed.';
+          await updateInvoice(recordId, {
             extracted: placeholderFailedExtracted(),
             reviewStatus: 'failed',
           });
-          updatePending(dbId, { status: 'error', errorMessage: msg });
-        } else {
-          extractionStashRef.current = { kind: 'error', message: msg };
-        }
-      } else {
-        Alert.alert('Error', msg);
-        setStep('preview');
-      }
+          updatePending(recordId, { status: 'error', errorMessage: msg });
+        });
+
+      goToDashboardHome();
+    } catch (err) {
+      Alert.alert(
+        'Could not save draft',
+        err instanceof Error ? err.message : 'Please try again.'
+      );
+      setStep('preview');
     }
   };
 
@@ -710,7 +646,6 @@ export default function AddInvoiceScreen({
                 pendingSessionIdRef.current = null;
                 draftInvoiceIdRef.current = null;
                 backgroundDbRecordIdRef.current = null;
-                extractionStashRef.current = null;
               }
               finishAndLeave();
             })(),
@@ -742,7 +677,6 @@ export default function AddInvoiceScreen({
     draftInvoiceIdRef.current = null;
     pendingSessionIdRef.current = null;
     backgroundDbRecordIdRef.current = null;
-    extractionStashRef.current = null;
     setStep('choose');
     setExtracted(null);
     setCategoryId(null);
@@ -784,7 +718,6 @@ export default function AddInvoiceScreen({
               pendingSessionIdRef.current = null;
               draftInvoiceIdRef.current = null;
               backgroundDbRecordIdRef.current = null;
-              extractionStashRef.current = null;
               finishAndLeave();
             })(),
         },
@@ -963,6 +896,18 @@ export default function AddInvoiceScreen({
     );
   }
 
+  if (step === 'submitting') {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <View style={styles.extractingCard}>
+          <ActivityIndicator size="large" color={PRIMARY} />
+          <Text style={styles.extractingTitle}>Processing</Text>
+          <Text style={styles.extractingSub}>Saving your receipt and sending it to be read…</Text>
+        </View>
+      </View>
+    );
+  }
+
   if (step === 'extracting') {
     return (
       <View style={[styles.container, styles.centered]}>
@@ -1001,8 +946,10 @@ export default function AddInvoiceScreen({
           </View>
         )}
         <View style={styles.reviewSummary}>
-          <Text style={styles.summaryLabel}>Merchant</Text>
-          <Text style={styles.reviewMerchant}>{extracted.merchantName ?? '—'}</Text>
+          <Text style={styles.summaryLabel}>Issued by</Text>
+          <Text style={styles.reviewMerchant}>{displayIssuedBy(extracted) ?? '—'}</Text>
+          <Text style={styles.summaryLabel}>Issued to</Text>
+          <Text style={styles.reviewMerchant}>{displayIssuedTo(extracted) ?? '—'}</Text>
           <Text style={styles.summaryLabel}>Amount</Text>
           <Text style={styles.reviewAmountExpense}>
             {formatAmount(extracted.amount ?? 0, extracted.currency)}
@@ -1061,12 +1008,30 @@ export default function AddInvoiceScreen({
             <Text style={styles.docLabel}>{fileName}</Text>
           </View>
         )}
-        <Text style={styles.fieldLabel}>Merchant</Text>
+        <Text style={styles.fieldLabel}>Issued by</Text>
         <TextInput
           style={styles.input}
-          placeholder="Merchant name"
-          value={extracted.merchantName ?? ''}
-          onChangeText={(t) => updateField('merchantName', t || undefined)}
+          placeholder="Seller / vendor on the receipt"
+          value={displayIssuedBy(extracted) ?? ''}
+          onChangeText={(t) => {
+            const v = t || undefined;
+            setExtracted((prev) =>
+              prev ? { ...prev, issuedBy: v, merchantName: v } : null
+            );
+          }}
+          placeholderTextColor={TEXT_MUTED}
+        />
+        <Text style={styles.fieldLabel}>Issued to</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Customer / bill to (if shown)"
+          value={displayIssuedTo(extracted) ?? ''}
+          onChangeText={(t) => {
+            const v = t || undefined;
+            setExtracted((prev) =>
+              prev ? { ...prev, issuedTo: v, ownedBy: v } : null
+            );
+          }}
           placeholderTextColor={TEXT_MUTED}
         />
         <Text style={styles.fieldLabel}>Amount</Text>
@@ -1163,7 +1128,7 @@ export default function AddInvoiceScreen({
           </LinearGradient>
           <Text style={styles.doneTitle}>Invoice saved</Text>
           <Text style={styles.doneSubtitle}>
-            {extracted.merchantName ?? 'Expense'} · {formatAmount(extracted.amount ?? 0, extracted.currency)}
+            {displayIssuedBy(extracted) ?? 'Expense'} · {formatAmount(extracted.amount ?? 0, extracted.currency)}
           </Text>
         </View>
         <TouchableOpacity style={styles.gradientBtnWrap} onPress={finishAndLeave} activeOpacity={0.92}>

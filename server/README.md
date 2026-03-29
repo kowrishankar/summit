@@ -6,7 +6,8 @@ This server handles Stripe subscription setup and creation for the app.
 
 1. Copy `.env.example` to `.env` and set:
    - **STRIPE_SECRET_KEY** – Your Stripe secret key (Dashboard → Developers → API keys). Use `sk_test_...` for development.
-   - **STRIPE_PRICE_ID** – Create a Product in Stripe Dashboard with a recurring price of £4.99/month, then paste the Price ID (e.g. `price_...`).
+   - **STRIPE_PRICE_ID** – Fallback Price ID if tier-specific IDs below are omitted. Create Products in Stripe for **Personal** (£4.99/mo), **Business** (£9.99/mo), and **Practice** (£14.99/mo), then set:
+   - **STRIPE_PRICE_ID_INDIVIDUAL**, **STRIPE_PRICE_ID_BUSINESS**, **STRIPE_PRICE_ID_PRACTICE** – Price IDs (`price_...`) for each tier. If any are unset, **STRIPE_PRICE_ID** is used for that tier (fine for early testing with one price).
    - **STRIPE_TRIAL_PERIOD_DAYS** – Optional; default `60`. Used when the app creates a subscription with a free trial (card collected up front; first charge at trial end).
    - **SUPABASE_URL** and **SUPABASE_SERVICE_ROLE_KEY** – Required for **POST /close-account** (in-app “Close account”: cancels Stripe subscription, deletes Stripe customer, removes Supabase auth user). From Supabase Dashboard → Settings → API (use **service_role**, never expose it in the app).
    - **PORT** – Optional; defaults to 4242.
@@ -22,10 +23,10 @@ This server handles Stripe subscription setup and creation for the app.
 
 ## Endpoints
 
-- **POST /prepare-subscription-payment** – Body: `{ "email": "user@example.com" }`. Creates or reuses an incomplete subscription and returns `{ clientSecret, subscriptionId, customerId, status: "requires_payment" }` so the app can open **one** Payment Sheet (first invoice PaymentIntent: card + first charge + 3DS). If the subscription is already active or trialing, returns `status`, `currentPeriodEnd`, `currentPeriodStart`, and no `clientSecret`.
-- **POST /create-trial-subscription** – Body: `{ "customerId": "cus_..." }`. Call **after** the client completes a SetupIntent (card on file). Creates a subscription with `trial_period_days` from `STRIPE_TRIAL_PERIOD_DAYS`; first charge runs at trial end. Returns `subscriptionId`, `status` (usually `trialing`), `currentPeriodEnd`, `currentPeriodStart`, `trialPeriodDays`.
+- **POST /prepare-subscription-payment** – Body: `{ "email": "user@example.com", "accountKind": "individual" | "business" | "practice", "additionalPracticeSlot": false }`. Picks the Stripe price for the tier (`accountKind` defaults to `individual`). For **Practice**, set `additionalPracticeSlot: true` to create **another** subscription for an extra client workspace (skips “already subscribed” deduplication). Returns `{ clientSecret, subscriptionId, customerId, status: "requires_payment" }` for Payment Sheet, or active/trialing details if already paid.
+- **POST /create-trial-subscription** – Body: `{ "customerId": "cus_...", "accountKind": "individual" | "business" | "practice" }`. Call **after** SetupIntent. Creates a trialing subscription for the tier’s price; first charge at trial end.
 - **POST /create-setup-intent** – Body: `{ "email": "user@example.com" }`. Returns `{ clientSecret, customerId }` for a SetupIntent-only flow (legacy; the app uses `/prepare-subscription-payment` instead).
-- **POST /create-subscription** – Body: `{ "customerId": "cus_..." }`. Creates a £4.99/month subscription using the customer’s payment method. Returns `subscriptionId`, `customerId`, `currentPeriodEnd`, and optionally `clientSecret` if the first charge needs confirmation (e.g. 3DS).
+- **POST /create-subscription** – Body: `{ "customerId": "cus_...", "accountKind": "individual" | "business" | "practice" }`. Creates a subscription for that tier’s price. Returns `subscriptionId`, `customerId`, `currentPeriodEnd`, and optionally `clientSecret` if the first charge needs confirmation (e.g. 3DS).
 - **POST /confirm-subscription** – Body: `{ "subscriptionId": "sub_..." }`. Returns subscription details including `customerId` and `currentPeriodEnd`.
 - **POST /create-portal-session** – Body: `{ "customerId": "cus_...", "returnUrl": "https://..." }`. Creates a Stripe Customer Portal session; returns `{ url }` to open in the browser so the customer can manage subscription, payment method, and invoices.
 - **POST /close-account** – Body: `{ "accessToken": "<Supabase JWT>" }`. Verifies the session, cancels subscriptions and deletes the Stripe customer linked from `subscriptions` for that user (if any), then deletes the Supabase auth user (database rows cascade). Returns `{ ok: true }`.

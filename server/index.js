@@ -9,7 +9,12 @@ app.use(cors({ origin: true }));
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const stripe = new Stripe(STRIPE_SECRET_KEY);
-const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
+/** Legacy single price — used when tier-specific IDs are not set. */
+const STRIPE_PRICE_ID_LEGACY = process.env.STRIPE_PRICE_ID;
+const STRIPE_PRICE_ID_INDIVIDUAL =
+  process.env.STRIPE_PRICE_ID_INDIVIDUAL || STRIPE_PRICE_ID_LEGACY;
+const STRIPE_PRICE_ID_BUSINESS = process.env.STRIPE_PRICE_ID_BUSINESS || STRIPE_PRICE_ID_LEGACY;
+const STRIPE_PRICE_ID_PRACTICE = process.env.STRIPE_PRICE_ID_PRACTICE || STRIPE_PRICE_ID_LEGACY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
@@ -20,9 +25,21 @@ const STRIPE_TRIAL_PERIOD_DAYS = Math.min(
 
 const isTestKey = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.startsWith('sk_test_');
 
+function normalizeAccountKind(raw) {
+  if (raw === 'business' || raw === 'practice') return raw;
+  return 'individual';
+}
+
+function priceIdForAccountKind(kind) {
+  const k = normalizeAccountKind(kind);
+  if (k === 'business') return STRIPE_PRICE_ID_BUSINESS;
+  if (k === 'practice') return STRIPE_PRICE_ID_PRACTICE;
+  return STRIPE_PRICE_ID_INDIVIDUAL;
+}
+
 /** Avoid duplicate subs: same customer + price already active or trialing. */
-async function findExistingSubscriptionForPrice(customerId) {
-  if (!STRIPE_PRICE_ID) return null;
+async function findExistingSubscriptionForPrice(customerId, priceId) {
+  if (!priceId) return null;
   for (const status of ['active', 'trialing']) {
     const subs = await stripe.subscriptions.list({
       customer: customerId,
@@ -30,20 +47,24 @@ async function findExistingSubscriptionForPrice(customerId) {
       limit: 20,
     });
     for (const sub of subs.data) {
-      const priceId = sub.items.data[0]?.price?.id;
-      if (priceId === STRIPE_PRICE_ID) return sub;
+      const pid = sub.items.data[0]?.price?.id;
+      if (pid === priceId) return sub;
     }
   }
   return null;
 }
 
-if (!STRIPE_PRICE_ID) {
-  console.warn('STRIPE_PRICE_ID not set. Create a Price in Stripe Dashboard for £4.99/month and set it.');
-} else if (STRIPE_PRICE_ID.startsWith('prod_')) {
-  console.error('STRIPE_PRICE_ID must be a Price ID (starts with price_), not a Product ID (prod_). In Dashboard → Products → your product → Pricing, copy the Price ID.');
+if (!STRIPE_PRICE_ID_INDIVIDUAL) {
+  console.warn(
+    'Set STRIPE_PRICE_ID (or STRIPE_PRICE_ID_INDIVIDUAL / _BUSINESS / _PRACTICE) to Price IDs from Stripe Dashboard.'
+  );
+} else if (STRIPE_PRICE_ID_INDIVIDUAL.startsWith('prod_')) {
+  console.error(
+    'Price env must be a Price ID (price_...), not a Product ID (prod_). Dashboard → Products → Pricing → copy Price ID.'
+  );
 } else {
   console.log(
-    `Stripe: using ${isTestKey ? 'TEST' : 'LIVE'} key. Price ID: ${STRIPE_PRICE_ID}. Trial: ${STRIPE_TRIAL_PERIOD_DAYS} day(s). Ensure price is in the same mode (Dashboard → Test/Live).`
+    `Stripe: ${isTestKey ? 'TEST' : 'LIVE'} key. Individual: ${STRIPE_PRICE_ID_INDIVIDUAL}; Business: ${STRIPE_PRICE_ID_BUSINESS}; Practice: ${STRIPE_PRICE_ID_PRACTICE}. Trial: ${STRIPE_TRIAL_PERIOD_DAYS} day(s).`
   );
 }
 
@@ -227,15 +248,16 @@ app.post('/create-setup-intent', async (req, res) => {
  */
 app.post('/create-trial-subscription', async (req, res) => {
   try {
-    const { customerId } = req.body;
+    const { customerId, accountKind } = req.body;
     if (!customerId || typeof customerId !== 'string') {
       return res.status(400).json({ error: 'customerId is required' });
     }
-    if (!STRIPE_PRICE_ID) {
-      return res.status(500).json({ error: 'STRIPE_PRICE_ID not configured' });
+    const priceId = priceIdForAccountKind(accountKind);
+    if (!priceId) {
+      return res.status(500).json({ error: 'Stripe price IDs not configured' });
     }
 
-    const existing = await findExistingSubscriptionForPrice(customerId);
+    const existing = await findExistingSubscriptionForPrice(customerId, priceId);
     if (existing) {
       const currentPeriodEnd = existing.current_period_end
         ? new Date(existing.current_period_end * 1000).toISOString()
@@ -271,7 +293,7 @@ app.post('/create-trial-subscription', async (req, res) => {
 
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
-      items: [{ price: STRIPE_PRICE_ID }],
+      items: [{ price: priceId }],
       trial_period_days: STRIPE_TRIAL_PERIOD_DAYS,
       default_payment_method: paymentMethodId,
       payment_settings: { save_default_payment_method: 'on_subscription' },
@@ -305,12 +327,16 @@ app.post('/create-trial-subscription', async (req, res) => {
  */
 app.post('/prepare-subscription-payment', async (req, res) => {
   try {
-    const { email } = req.body;
+    const { email, accountKind, additionalPracticeSlot } = req.body;
     if (!email || typeof email !== 'string') {
       return res.status(400).json({ error: 'email is required' });
     }
-    if (!STRIPE_PRICE_ID) {
-      return res.status(500).json({ error: 'STRIPE_PRICE_ID not configured' });
+    if (additionalPracticeSlot === true && normalizeAccountKind(accountKind) !== 'practice') {
+      return res.status(400).json({ error: 'additionalPracticeSlot requires accountKind practice' });
+    }
+    const priceId = priceIdForAccountKind(accountKind);
+    if (!priceId) {
+      return res.status(500).json({ error: 'Stripe price IDs not configured' });
     }
 
     const customers = await stripe.customers.list({ email: email.trim(), limit: 1 });
@@ -319,7 +345,10 @@ app.post('/prepare-subscription-payment', async (req, res) => {
       customer = await stripe.customers.create({ email: email.trim() });
     }
 
-    const existingPaidOrTrial = await findExistingSubscriptionForPrice(customer.id);
+    const skipDuplicateCheck = additionalPracticeSlot === true;
+    const existingPaidOrTrial = skipDuplicateCheck
+      ? null
+      : await findExistingSubscriptionForPrice(customer.id, priceId);
     if (existingPaidOrTrial) {
       const currentPeriodEnd = existingPaidOrTrial.current_period_end
         ? new Date(existingPaidOrTrial.current_period_end * 1000).toISOString()
@@ -347,9 +376,10 @@ app.post('/prepare-subscription-payment', async (req, res) => {
     let subscription;
     let paymentIntent = null;
 
+    if (!skipDuplicateCheck)
     for (const sub of existingIncomplete.data) {
-      const priceId = sub.items.data[0]?.price?.id;
-      if (priceId !== STRIPE_PRICE_ID) continue;
+      const subPriceId = sub.items.data[0]?.price?.id;
+      if (subPriceId !== priceId) continue;
       const inv = sub.latest_invoice;
       if (typeof inv !== 'object' || !inv) continue;
       let pi = inv.payment_intent;
@@ -369,7 +399,7 @@ app.post('/prepare-subscription-payment', async (req, res) => {
     if (!subscription) {
       subscription = await stripe.subscriptions.create({
         customer: customer.id,
-        items: [{ price: STRIPE_PRICE_ID }],
+        items: [{ price: priceId }],
         payment_behavior: 'default_incomplete',
         payment_settings: {
           save_default_payment_method: 'on_subscription',
@@ -443,12 +473,13 @@ app.post('/prepare-subscription-payment', async (req, res) => {
 /** Create subscription for customer; uses their default or first attached payment method. */
 app.post('/create-subscription', async (req, res) => {
   try {
-    const { customerId } = req.body;
+    const { customerId, accountKind } = req.body;
     if (!customerId || typeof customerId !== 'string') {
       return res.status(400).json({ error: 'customerId is required' });
     }
-    if (!STRIPE_PRICE_ID) {
-      return res.status(500).json({ error: 'STRIPE_PRICE_ID not configured' });
+    const priceId = priceIdForAccountKind(accountKind);
+    if (!priceId) {
+      return res.status(500).json({ error: 'Stripe price IDs not configured' });
     }
 
     const paymentMethods = await stripe.paymentMethods.list({
@@ -466,7 +497,7 @@ app.post('/create-subscription', async (req, res) => {
 
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
-      items: [{ price: STRIPE_PRICE_ID }],
+      items: [{ price: priceId }],
       payment_behavior: 'default_incomplete',
       payment_settings: {
         save_default_payment_method: 'on_subscription',

@@ -45,7 +45,12 @@ export default function EditInvoiceScreen({
   );
 
   const [saving, setSaving] = useState(false);
-  const [merchantName, setMerchantName] = useState(invoice?.extracted.merchantName ?? '');
+  const [issuedBy, setIssuedBy] = useState(
+    invoice?.extracted.issuedBy ?? invoice?.extracted.merchantName ?? ''
+  );
+  const [issuedTo, setIssuedTo] = useState(
+    invoice?.extracted.issuedTo ?? invoice?.extracted.ownedBy ?? ''
+  );
   const [amount, setAmount] = useState(String(invoice?.extracted.amount ?? ''));
   const [currency, setCurrency] = useState(invoice?.extracted.currency ?? '');
   const [date, setDate] = useState(invoice?.extracted.date ?? '');
@@ -57,7 +62,6 @@ export default function EditInvoiceScreen({
   const [merchantEmail, setMerchantEmail] = useState(invoice?.extracted.merchantEmail ?? '');
   const [supplierName, setSupplierName] = useState(invoice?.extracted.supplierName ?? '');
   const [paymentType, setPaymentType] = useState(invoice?.extracted.paymentType ?? '');
-  const [ownedBy, setOwnedBy] = useState(invoice?.extracted.ownedBy ?? '');
   const [documentReference, setDocumentReference] = useState(invoice?.extracted.documentReference ?? '');
   const [categoryId, setCategoryId] = useState<string | null>(invoice?.categoryId ?? null);
 
@@ -85,7 +89,10 @@ export default function EditInvoiceScreen({
     try {
       const updatedExtracted: ExtractedInvoiceData = {
         ...invoice.extracted,
-        merchantName: merchantName.trim() || undefined,
+        issuedBy: issuedBy.trim() || undefined,
+        issuedTo: issuedTo.trim() || undefined,
+        merchantName: issuedBy.trim() || undefined,
+        ownedBy: issuedTo.trim() || undefined,
         amount: numAmount,
         currency: (currency.trim() || 'GBP').toUpperCase(),
         date: trimmedDate || invoice.extracted.date,
@@ -95,7 +102,6 @@ export default function EditInvoiceScreen({
         merchantEmail: merchantEmail.trim() || undefined,
         supplierName: supplierName.trim() || undefined,
         paymentType: paymentType.trim() || undefined,
-        ownedBy: ownedBy.trim() || undefined,
         documentReference: documentReference.trim() || undefined,
       };
       await updateInvoice(invoice.id, {
@@ -130,12 +136,21 @@ export default function EditInvoiceScreen({
         placeholderTextColor={TEXT_MUTED}
       />
 
-      <Text style={styles.fieldLabel}>Merchant name</Text>
+      <Text style={styles.fieldLabel}>Issued by</Text>
       <TextInput
         style={styles.input}
-        placeholder="Merchant or vendor"
-        value={merchantName}
-        onChangeText={setMerchantName}
+        placeholder="Seller / vendor on the receipt"
+        value={issuedBy}
+        onChangeText={setIssuedBy}
+        placeholderTextColor={TEXT_MUTED}
+      />
+
+      <Text style={styles.fieldLabel}>Issued to</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Customer / bill to (if shown)"
+        value={issuedTo}
+        onChangeText={setIssuedTo}
         placeholderTextColor={TEXT_MUTED}
       />
 
@@ -224,15 +239,6 @@ export default function EditInvoiceScreen({
         onChangeText={setPaymentType}
         placeholderTextColor={TEXT_MUTED}
       />
-      <Text style={styles.fieldLabel}>Owned by / customer</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Customer or billed to"
-        value={ownedBy}
-        onChangeText={setOwnedBy}
-        placeholderTextColor={TEXT_MUTED}
-      />
-
       <Text style={styles.fieldLabel}>Category</Text>
       <View style={styles.chipRow}>
         <TouchableOpacity

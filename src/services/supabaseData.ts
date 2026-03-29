@@ -1,5 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '../lib/supabase';
+import { PLAN_AMOUNT_PENCE } from '../config/pricing';
 import type {
   BusinessAccount,
   Category,
@@ -10,7 +11,6 @@ import type {
   ReviewStatus,
 } from '../types';
 
-const MONTHLY_PRICE_PENCE = 1499;
 const CURRENCY = 'GBP';
 
 /** Owners whose businesses this user may access as a team member. */
@@ -333,6 +333,7 @@ export async function upsertSubscriptionFromStripe(
     stripeCustomerId?: string;
     /** Stripe `trialing` vs paid `active` */
     status?: 'active' | 'trialing';
+    amountPence?: number;
   }
 ): Promise<Subscription> {
   const now = new Date().toISOString();
@@ -343,11 +344,12 @@ export async function upsertSubscriptionFromStripe(
     .maybeSingle();
 
   const status = params.status ?? 'active';
+  const amountPence = params.amountPence ?? PLAN_AMOUNT_PENCE.individual;
 
   const row = {
     user_id: userId,
     status,
-    amount_pence: MONTHLY_PRICE_PENCE,
+    amount_pence: amountPence,
     currency: CURRENCY,
     interval: 'month',
     current_period_start: params.currentPeriodStart ?? existing?.current_period_start ?? now,
@@ -372,6 +374,80 @@ export async function upsertSubscriptionFromStripe(
     });
     if (error) throw new Error(error.message);
     return rowToSubscription({ id, ...row, created_at: now });
+  }
+}
+
+/** Invoice count across businesses owned by this user (for Personal plan limits). */
+export async function countInvoicesAcrossOwnedBusinesses(userId: string): Promise<number> {
+  const { data: businesses, error: bErr } = await supabase
+    .from('business_accounts')
+    .select('id')
+    .eq('user_id', userId);
+  if (bErr) throw new Error(bErr.message);
+  const ids = (businesses ?? []).map((r: { id: string }) => r.id);
+  if (ids.length === 0) return 0;
+  const { count, error } = await supabase
+    .from('invoices')
+    .select('*', { count: 'exact', head: true })
+    .in('business_id', ids);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/** Sale (income) count across businesses owned by this user (for Personal plan limits). */
+export async function countSalesAcrossOwnedBusinesses(userId: string): Promise<number> {
+  const { data: businesses, error: bErr } = await supabase
+    .from('business_accounts')
+    .select('id')
+    .eq('user_id', userId);
+  if (bErr) throw new Error(bErr.message);
+  const ids = (businesses ?? []).map((r: { id: string }) => r.id);
+  if (ids.length === 0) return 0;
+  const { count, error } = await supabase
+    .from('sales')
+    .select('*', { count: 'exact', head: true })
+    .in('business_id', ids);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/**
+ * Extra Stripe subscriptions for practice users (one per additional client workspace after the first).
+ * Optional table — if missing, insert fails with a clear message (run SQL in docs).
+ */
+export async function insertPracticeSubscriptionAddon(params: {
+  userId: string;
+  businessId: string;
+  stripeSubscriptionId: string;
+  amountPence: number;
+  status: string;
+  currentPeriodEnd: string;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const id = uuidv4();
+  const { error } = await supabase.from('practice_subscription_addons').insert({
+    id,
+    user_id: params.userId,
+    business_id: params.businessId,
+    stripe_subscription_id: params.stripeSubscriptionId,
+    amount_pence: params.amountPence,
+    status: params.status,
+    current_period_end: params.currentPeriodEnd,
+    created_at: now,
+  });
+  if (error) {
+    if (__DEV__) {
+      console.warn(
+        '[insertPracticeSubscriptionAddon]',
+        error.message,
+        '(Add table: docs/SUPABASE-SETUP.md — practice_subscription_addons.)'
+      );
+    }
+    throw new Error(
+      error.message.includes('practice_subscription_addons') || error.code === '42P01'
+        ? 'Database needs table practice_subscription_addons. See docs/SUPABASE-SETUP.md.'
+        : error.message
+    );
   }
 }
 

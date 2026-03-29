@@ -18,6 +18,7 @@ import { WebView } from 'react-native-webview';
 import ImageView from 'react-native-image-viewing';
 import { useApp } from '../contexts/AppContext';
 import { formatAmount } from '../utils/currency';
+import { displayIssuedBy, displayIssuedTo } from '../utils/extractedParties';
 import { format } from 'date-fns';
 import {
   BORDER,
@@ -146,7 +147,7 @@ export default function InvoiceDetailScreen({
           <View style={styles.summaryTopText}>
             <Text style={styles.typeLabel}>Expense</Text>
             <Text style={styles.summaryMerchant} numberOfLines={2}>
-              {e.supplierName ?? e.merchantName ?? 'Unknown'}
+              {displayIssuedBy(e) ?? 'Unknown'}
             </Text>
           </View>
         </View>
@@ -165,9 +166,15 @@ export default function InvoiceDetailScreen({
         </View>
       </View>
 
-      {(e.documentReference || e.currency || e.paymentType || e.ownedBy) ? (
+      {(e.documentReference || e.currency || e.paymentType || displayIssuedTo(e)) ? (
         <View style={styles.sectionCard}>
           <Text style={styles.sectionCardTitle}>Transaction</Text>
+          {displayIssuedTo(e) ? (
+            <View style={styles.kvRow}>
+              <Text style={styles.kvLabel}>Issued to</Text>
+              <Text style={styles.kvValue}>{displayIssuedTo(e)}</Text>
+            </View>
+          ) : null}
           {e.documentReference ? (
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Reference</Text>
@@ -184,12 +191,6 @@ export default function InvoiceDetailScreen({
             <View style={styles.kvRow}>
               <Text style={styles.kvLabel}>Payment</Text>
               <Text style={styles.kvValue}>{e.paymentType}</Text>
-            </View>
-          ) : null}
-          {e.ownedBy ? (
-            <View style={styles.kvRow}>
-              <Text style={styles.kvLabel}>Owned by</Text>
-              <Text style={styles.kvValue}>{e.ownedBy}</Text>
             </View>
           ) : null}
         </View>

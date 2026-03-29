@@ -1,3 +1,5 @@
+import type { AccountKind } from '../types';
+
 const API_URL = process.env.EXPO_PUBLIC_STRIPE_API_URL || 'http://localhost:4242';
 const REQUEST_TIMEOUT_MS = 60000; // 60 seconds for Stripe + network
 
@@ -80,18 +82,30 @@ export async function createSetupIntent(
   return data;
 }
 
-export async function createSubscription(customerId: string): Promise<{
+export async function createSubscription(
+  customerId: string,
+  accountKind?: AccountKind
+): Promise<{
   subscriptionId: string;
   currentPeriodEnd?: string;
   status: string;
   clientSecret?: string;
   customerId?: string;
 }> {
-  return postJson('/create-subscription', { customerId });
+  return postJson('/create-subscription', { customerId, accountKind });
 }
 
+export type PrepareSubscriptionOptions = {
+  accountKind?: AccountKind;
+  /** Practice: create another Stripe subscription for an extra client workspace (same price as practice tier). */
+  additionalPracticeSlot?: boolean;
+};
+
 /** Single PaymentSheet: first invoice PaymentIntent (card + first charge + 3DS if needed). */
-export async function prepareSubscriptionPayment(email: string): Promise<{
+export async function prepareSubscriptionPayment(
+  email: string,
+  options?: PrepareSubscriptionOptions
+): Promise<{
   subscriptionId: string;
   customerId: string;
   status: string;
@@ -108,13 +122,20 @@ export async function prepareSubscriptionPayment(email: string): Promise<{
     currentPeriodEnd?: string;
     currentPeriodStart?: string;
     stripeMode?: 'test' | 'live';
-  }>('/prepare-subscription-payment', { email });
+  }>('/prepare-subscription-payment', {
+    email,
+    accountKind: options?.accountKind,
+    additionalPracticeSlot: options?.additionalPracticeSlot,
+  });
   assertPublishableKeyMatchesServerMode(data.stripeMode);
   return data;
 }
 
 /** After SetupIntent succeeds: subscription in `trialing`; charge at trial end. */
-export async function createTrialSubscription(customerId: string): Promise<{
+export async function createTrialSubscription(
+  customerId: string,
+  accountKind?: AccountKind
+): Promise<{
   subscriptionId: string;
   customerId: string;
   status: string;
@@ -131,7 +152,7 @@ export async function createTrialSubscription(customerId: string): Promise<{
     currentPeriodStart: string | null;
     trialPeriodDays: number;
     stripeMode?: 'test' | 'live';
-  }>('/create-trial-subscription', { customerId });
+  }>('/create-trial-subscription', { customerId, accountKind });
   assertPublishableKeyMatchesServerMode(data.stripeMode);
   return data;
 }

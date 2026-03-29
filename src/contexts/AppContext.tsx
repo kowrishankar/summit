@@ -6,7 +6,9 @@ import type {
   Category,
   InvoiceFilters,
   SpendSummary,
+  AccountKind,
 } from '../types';
+import { PERSONAL_MAX_INVOICES, PERSONAL_MAX_SALES } from '../config/pricing';
 import { useAuth } from './AuthContext';
 import { startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import * as supabaseData from '../services/supabaseData';
@@ -174,11 +176,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addInvoice = useCallback(
     async (inv: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'>) => {
       if (!currentBusiness) throw new Error('No business selected');
+      if (!user) throw new Error('Not logged in');
+      const kind: AccountKind = user.accountKind ?? 'individual';
+      if (kind === 'individual') {
+        const n = await supabaseData.countInvoicesAcrossOwnedBusinesses(user.id);
+        if (n >= PERSONAL_MAX_INVOICES) {
+          throw new Error(
+            `Personal plan allows up to ${PERSONAL_MAX_INVOICES} invoices. Switch to a Business subscription for higher limits.`
+          );
+        }
+      }
       const newInv = await supabaseData.addInvoice(currentBusiness.id, inv);
       setInvoices((prev) => [newInv, ...prev]);
       return newInv;
     },
-    [currentBusiness]
+    [currentBusiness, user]
   );
 
   const updateInvoice = useCallback(async (id: string, patch: Partial<Invoice>) => {
@@ -196,11 +208,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addSale = useCallback(
     async (sale: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>) => {
       if (!currentBusiness) throw new Error('No business selected');
+      if (!user) throw new Error('Not logged in');
+      const kind: AccountKind = user.accountKind ?? 'individual';
+      if (kind === 'individual') {
+        const n = await supabaseData.countSalesAcrossOwnedBusinesses(user.id);
+        if (n >= PERSONAL_MAX_SALES) {
+          throw new Error(
+            `Personal plan allows up to ${PERSONAL_MAX_SALES} income entries. Switch to a Business subscription for higher limits.`
+          );
+        }
+      }
       const newSale = await supabaseData.addSale(currentBusiness.id, sale);
       setSales((prev) => [newSale, ...prev]);
       return newSale;
     },
-    [currentBusiness]
+    [currentBusiness, user]
   );
 
   const updateSale = useCallback(async (id: string, patch: Partial<Sale>) => {
@@ -247,6 +269,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         list = list.filter(
           (i) =>
             i.extracted.merchantName?.toLowerCase().includes(q) ||
+            i.extracted.issuedBy?.toLowerCase().includes(q) ||
+            i.extracted.issuedTo?.toLowerCase().includes(q) ||
+            i.extracted.ownedBy?.toLowerCase().includes(q) ||
             i.extracted.category?.toLowerCase().includes(q) ||
             i.fileName?.toLowerCase().includes(q)
         );
@@ -275,6 +300,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         list = list.filter(
           (s) =>
             s.extracted.merchantName?.toLowerCase().includes(q) ||
+            s.extracted.issuedBy?.toLowerCase().includes(q) ||
+            s.extracted.issuedTo?.toLowerCase().includes(q) ||
+            s.extracted.ownedBy?.toLowerCase().includes(q) ||
             s.extracted.category?.toLowerCase().includes(q) ||
             s.fileName?.toLowerCase().includes(q)
         );

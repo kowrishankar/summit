@@ -7,19 +7,21 @@ const EXTRACTION_SCHEMA = `Extract invoice data and return a single JSON object 
 IMPORTANT - Dates: Invoice dates are in UK format (day first): DD/MM/YYYY or DD-MM-YYYY (e.g. 25/03/2025 = 25 March 2025). Always interpret dates as UK format (day, then month, then year). Output the "date" field as YYYY-MM-DD only (e.g. 2025-03-25).
 
 {
-  "merchantName": string | null,
+  "issuedBy": string | null (the company or person ISSUING the receipt or invoice — the seller/vendor you pay on purchases; the business receiving payment on sales),
+  "issuedTo": string | null (the CUSTOMER or party the document is issued to — "Bill to", "Sold to", "Customer", buyer name; on expenses this is often yourself or your business),
+  "merchantName": string | null (trading or store name if shown; may match issuedBy),
   "merchantAddress": string | null,
   "merchantPhone": string | null,
   "merchantEmail": string | null,
   "merchantWebsite": string | null,
-  "supplierName": string | null (supplier/vendor name if different from merchant),
+  "supplierName": string | null (legal or parent supplier name only if clearly different from issuedBy/merchant),
   "vatAmount": number | null,
   "category": string | null (whenever you can infer it from merchant, supplier, or line items: a SHORT bookkeeping label — do not leave null if the type of spend or income is reasonably clear),
   "currency": string | null (ISO 4217 code e.g. USD, EUR, GBP),
   "amount": number,
   "date": string (YYYY-MM-DD; interpret source dates as UK format DD/MM/YYYY),
   "paymentType": string | null (e.g. Card, Bank transfer, Cash, Invoice, Credit),
-  "ownedBy": string | null (customer name / billed to / recipient),
+  "ownedBy": string | null (optional duplicate of issuedTo for compatibility),
   "documentReference": string | null (invoice number, reference, or order ID),
   "lineItems": Array<{
     "description": string,
@@ -45,6 +47,17 @@ function docKindCategoryHint(docKind: 'invoice' | 'sale'): string {
   return ' For "category", infer a concise UK-friendly EXPENSE label when possible (e.g. Travel, Meals, Software subscriptions, Office supplies, Rent, Utilities, Motor fuel, Groceries, Professional fees, Insurance, Telecommunications). Prefer a specific label over null.';
 }
 
+function docKindPartyHint(docKind: 'invoice' | 'sale'): string {
+  if (docKind === 'sale') {
+    return ' For SALES/INCOME: issuedBy = the business or person issuing the receipt (seller). issuedTo = the customer or client paying (buyer). When both appear on the document, never swap them.';
+  }
+  return ' For PURCHASES/EXPENSES: issuedBy = the shop, supplier, or vendor that issued the receipt (seller). issuedTo = the billed-to party (often you or your company — "Bill to", "Customer"). When both appear, never swap them.';
+}
+
+function extractionHints(docKind: 'invoice' | 'sale'): string {
+  return `${docKindCategoryHint(docKind)} ${docKindPartyHint(docKind)}`;
+}
+
 export async function extractFromText(
   text: string,
   docKind: 'invoice' | 'sale' = 'invoice'
@@ -58,7 +71,7 @@ export async function extractFromText(
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
+        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}${extractionHints(docKind)}`,
       },
       {
         role: 'user',
@@ -91,7 +104,7 @@ export async function extractFromImageBase64(
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. Analyze the invoice image and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
+        content: `You are an invoice data extractor. Analyze the invoice image and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}${extractionHints(docKind)}`,
       },
       {
         role: 'user',
@@ -133,7 +146,7 @@ export async function extractFromPdfBase64(
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. Analyze the PDF invoice and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
+        content: `You are an invoice data extractor. Analyze the PDF invoice and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}${extractionHints(docKind)}`,
       },
       {
         role: 'user',
@@ -193,7 +206,7 @@ export async function extractFromMultipleImagesBase64(
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
+        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}${extractionHints(docKind)}`,
       },
       { role: 'user', content },
     ],
@@ -210,22 +223,47 @@ export async function extractFromMultipleImagesBase64(
   }
 }
 
+function strField(v: unknown): string | undefined {
+  if (typeof v !== 'string') return undefined;
+  const t = v.trim();
+  return t.length ? t : undefined;
+}
+
 function normalizeExtraction(parsed: Record<string, unknown>): ExtractedInvoiceData {
   const lineItems = (parsed.lineItems as unknown[] | undefined) || [];
+
+  const issuedTo = strField(parsed.issuedTo) ?? strField(parsed.ownedBy);
+  const issuedBy =
+    strField(parsed.issuedBy) ?? strField(parsed.merchantName) ?? strField(parsed.supplierName);
+
+  const merchantNameRaw = strField(parsed.merchantName);
+  const supplierNameRaw = strField(parsed.supplierName);
+
+  const merchantName = issuedBy ?? merchantNameRaw ?? supplierNameRaw;
+
+  let supplierName: string | undefined = supplierNameRaw;
+  if (!supplierName || (merchantName && supplierName === merchantName)) {
+    supplierName = undefined;
+  }
+
+  const ownedBy = issuedTo ?? strField(parsed.ownedBy);
+
   return {
-    merchantName: typeof parsed.merchantName === 'string' ? parsed.merchantName : undefined,
+    issuedBy,
+    issuedTo,
+    merchantName,
     merchantAddress: typeof parsed.merchantAddress === 'string' ? parsed.merchantAddress : undefined,
     merchantPhone: typeof parsed.merchantPhone === 'string' ? parsed.merchantPhone : undefined,
     merchantEmail: typeof parsed.merchantEmail === 'string' ? parsed.merchantEmail : undefined,
     merchantWebsite: typeof parsed.merchantWebsite === 'string' ? parsed.merchantWebsite : undefined,
-    supplierName: typeof parsed.supplierName === 'string' ? parsed.supplierName : undefined,
+    supplierName,
     vatAmount: typeof parsed.vatAmount === 'number' ? parsed.vatAmount : undefined,
     category: typeof parsed.category === 'string' ? parsed.category : undefined,
     currency: typeof parsed.currency === 'string' ? parsed.currency : undefined,
     amount: typeof parsed.amount === 'number' ? parsed.amount : 0,
     date: typeof parsed.date === 'string' ? parsed.date : new Date().toISOString().slice(0, 10),
     paymentType: typeof parsed.paymentType === 'string' ? parsed.paymentType : undefined,
-    ownedBy: typeof parsed.ownedBy === 'string' ? parsed.ownedBy : undefined,
+    ownedBy,
     documentReference: typeof parsed.documentReference === 'string' ? parsed.documentReference : undefined,
     lineItems: lineItems.map((item: unknown, i: number) => {
       const o = item as Record<string, unknown>;
@@ -245,6 +283,8 @@ function normalizeExtraction(parsed: Record<string, unknown>): ExtractedInvoiceD
 
 function mockExtraction(source: string): ExtractedInvoiceData {
   return {
+    issuedBy: 'Sample Merchant',
+    issuedTo: undefined,
     merchantName: 'Sample Merchant',
     merchantAddress: undefined,
     merchantPhone: undefined,

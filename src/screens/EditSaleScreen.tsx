@@ -45,7 +45,12 @@ export default function EditSaleScreen({
   );
 
   const [saving, setSaving] = useState(false);
-  const [merchantName, setMerchantName] = useState(sale?.extracted.merchantName ?? '');
+  const [issuedBy, setIssuedBy] = useState(
+    sale?.extracted.issuedBy ?? sale?.extracted.merchantName ?? ''
+  );
+  const [issuedTo, setIssuedTo] = useState(
+    sale?.extracted.issuedTo ?? sale?.extracted.ownedBy ?? ''
+  );
   const [amount, setAmount] = useState(String(sale?.extracted.amount ?? ''));
   const [currency, setCurrency] = useState(sale?.extracted.currency ?? '');
   const [date, setDate] = useState(sale?.extracted.date ?? '');
@@ -57,7 +62,6 @@ export default function EditSaleScreen({
   const [merchantEmail, setMerchantEmail] = useState(sale?.extracted.merchantEmail ?? '');
   const [supplierName, setSupplierName] = useState(sale?.extracted.supplierName ?? '');
   const [paymentType, setPaymentType] = useState(sale?.extracted.paymentType ?? '');
-  const [ownedBy, setOwnedBy] = useState(sale?.extracted.ownedBy ?? '');
   const [documentReference, setDocumentReference] = useState(sale?.extracted.documentReference ?? '');
   const [categoryId, setCategoryId] = useState<string | null>(sale?.categoryId ?? null);
 
@@ -85,7 +89,9 @@ export default function EditSaleScreen({
     try {
       const updatedExtracted: ExtractedInvoiceData = {
         ...sale.extracted,
-        merchantName: merchantName.trim() || undefined,
+        issuedBy: issuedBy.trim() || undefined,
+        issuedTo: issuedTo.trim() || undefined,
+        merchantName: issuedBy.trim() || undefined,
         amount: numAmount,
         currency: (currency.trim() || 'GBP').toUpperCase(),
         date: trimmedDate || sale.extracted.date,
@@ -95,7 +101,7 @@ export default function EditSaleScreen({
         merchantEmail: merchantEmail.trim() || undefined,
         supplierName: supplierName.trim() || undefined,
         paymentType: paymentType.trim() || undefined,
-        ownedBy: ownedBy.trim() || undefined,
+        ownedBy: issuedTo.trim() || undefined,
         documentReference: documentReference.trim() || undefined,
       };
       await updateSale(sale.id, {
@@ -130,12 +136,21 @@ export default function EditSaleScreen({
         placeholderTextColor={TEXT_MUTED}
       />
 
-      <Text style={styles.fieldLabel}>Merchant or customer</Text>
+      <Text style={styles.fieldLabel}>Issued by</Text>
       <TextInput
         style={styles.input}
-        placeholder="Name shown on the sale"
-        value={merchantName}
-        onChangeText={setMerchantName}
+        placeholder="Seller / business on the receipt"
+        value={issuedBy}
+        onChangeText={setIssuedBy}
+        placeholderTextColor={TEXT_MUTED}
+      />
+
+      <Text style={styles.fieldLabel}>Issued to</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Customer / buyer (if shown)"
+        value={issuedTo}
+        onChangeText={setIssuedTo}
         placeholderTextColor={TEXT_MUTED}
       />
 
@@ -224,15 +239,6 @@ export default function EditSaleScreen({
         onChangeText={setPaymentType}
         placeholderTextColor={TEXT_MUTED}
       />
-      <Text style={styles.fieldLabel}>Owned by / customer</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Who the sale is for"
-        value={ownedBy}
-        onChangeText={setOwnedBy}
-        placeholderTextColor={TEXT_MUTED}
-      />
-
       <Text style={styles.fieldLabel}>Category</Text>
       <View style={styles.chipRow}>
         <TouchableOpacity

@@ -24,7 +24,11 @@ export interface ExtractedInvoiceData {
   date: string;
   /** Payment type e.g. Card, Bank transfer, Cash, Invoice */
   paymentType?: string;
-  /** Customer / billed to / owned by */
+  /** Party issuing the receipt or invoice (seller / vendor). Often matches merchantName. */
+  issuedBy?: string;
+  /** Customer or party the document is issued to (bill-to, buyer). Often matches ownedBy. */
+  issuedTo?: string;
+  /** Customer / billed to — kept in sync with issuedTo for older data */
   ownedBy?: string;
   /** Document reference / invoice number */
   documentReference?: string;

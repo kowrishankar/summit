@@ -37,7 +37,19 @@ CREATE TABLE categories (
 );
 
 -- Invoices (expenses)
-r
+CREATE TABLE invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID NOT NULL REFERENCES business_accounts(id) ON DELETE CASCADE,
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  source TEXT NOT NULL CHECK (source IN ('upload', 'manual')),
+  file_uri TEXT,
+  file_uris TEXT[],
+  file_name TEXT,
+  extracted JSONB NOT NULL DEFAULT '{}',
+  review_status TEXT NOT NULL DEFAULT 'complete' CHECK (review_status IN ('complete', 'processing', 'pending_review', 'failed')),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 -- Sales (income)
 CREATE TABLE sales (
@@ -133,6 +145,29 @@ ALTER TABLE invoices
 ALTER TABLE sales
   ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'complete'
   CHECK (review_status IN ('complete', 'processing', 'pending_review', 'failed'));
+```
+
+**Practice add-on billing** (optional): when a practice user pays for an extra client workspace, the app records the extra Stripe subscription here. Run once in **SQL Editor** if you use that feature:
+
+```sql
+CREATE TABLE IF NOT EXISTS practice_subscription_addons (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  business_id UUID NOT NULL REFERENCES business_accounts(id) ON DELETE CASCADE,
+  stripe_subscription_id TEXT NOT NULL,
+  amount_pence INT NOT NULL,
+  status TEXT NOT NULL,
+  current_period_end TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE(business_id)
+);
+
+ALTER TABLE practice_subscription_addons ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users manage own practice addon rows"
+  ON practice_subscription_addons FOR ALL
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 ```
 
 ### Team access (invite collaborators)

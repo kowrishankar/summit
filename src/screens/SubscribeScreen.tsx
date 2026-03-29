@@ -23,6 +23,7 @@ import {
   createSetupIntent,
   createTrialSubscription,
 } from '../services/stripeApi';
+import { getPlanForAccountKind } from '../config/pricing';
 import { createSubscriptionFromStripe, hasActiveAccess } from '../services/subscription';
 import {
   BORDER,
@@ -101,6 +102,7 @@ function SubscribeScreenWithStripe() {
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
   const [loading, setLoading] = useState(false);
   const [startWithTrial, setStartWithTrial] = useState(false);
+  const plan = getPlanForAccountKind(user?.accountKind);
 
   useEffect(() => {
     void AsyncStorage.getItem(TRIAL_PREF_KEY).then((v) => {
@@ -152,7 +154,7 @@ function SubscribeScreenWithStripe() {
           return;
         }
 
-        const trialRes = await createTrialSubscription(customerId);
+        const trialRes = await createTrialSubscription(customerId, user.accountKind);
         const currentPeriodEnd =
           trialRes.currentPeriodEnd ??
           new Date(Date.now() + STRIPE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -165,6 +167,7 @@ function SubscribeScreenWithStripe() {
           stripeSubscriptionId: trialRes.subscriptionId,
           stripeCustomerId: trialRes.customerId,
           status: mapStripeStatusForDb(trialRes.status),
+          amountPence: plan.amountPence,
         });
         await AsyncStorage.removeItem(TRIAL_PREF_KEY);
         await refreshSubscription(user.id);
@@ -172,7 +175,9 @@ function SubscribeScreenWithStripe() {
         return;
       }
 
-      const subResponse = await prepareSubscriptionPayment(user.email);
+      const subResponse = await prepareSubscriptionPayment(user.email, {
+        accountKind: user.accountKind,
+      });
 
       if (subResponse.status === 'requires_payment' && subResponse.clientSecret) {
         const { error: initError } = await initPaymentSheet({
@@ -218,6 +223,7 @@ function SubscribeScreenWithStripe() {
         stripeSubscriptionId: subResponse.subscriptionId,
         stripeCustomerId,
         status: mapStripeStatusForDb(confirmed.status),
+        amountPence: plan.amountPence,
       });
       await AsyncStorage.removeItem(TRIAL_PREF_KEY);
       await refreshSubscription(user.id);
@@ -265,9 +271,12 @@ function SubscribeScreenWithStripe() {
       </View>
 
       <View style={styles.priceBlock}>
-        <AppText style={styles.price}>£4.99</AppText>
+        <AppText style={styles.price}>{plan.priceDisplay}</AppText>
         <AppText style={styles.pricePeriod}>per month</AppText>
       </View>
+      {plan.limitNote ? (
+        <AppText style={styles.planLimitNote}>{plan.limitNote}</AppText>
+      ) : null}
       <AppText style={styles.cancelNote}>Cancel anytime in Settings. No long-term commitment.</AppText>
 
       {!isWeb && (
@@ -275,8 +284,8 @@ function SubscribeScreenWithStripe() {
           <View style={styles.trialTextCol}>
             <AppText style={styles.trialTitle}>Start with a free trial</AppText>
             <AppText style={styles.trialHint}>
-              {STRIPE_TRIAL_DAYS} days free, then £4.99/month. Add a card now — you won’t be charged until the trial
-              ends.
+              {STRIPE_TRIAL_DAYS} days free, then {plan.priceDisplay}/month. Add a card now — you won’t be charged
+              until the trial ends.
             </AppText>
           </View>
           <Switch
@@ -409,6 +418,14 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     marginBottom: 12,
     textAlign: 'center',
+  },
+  planLimitNote: {
+    fontSize: 13,
+    color: TEXT_SECONDARY,
+    marginBottom: 14,
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 8,
   },
   trialRow: {
     width: '100%',
