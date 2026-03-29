@@ -7,7 +7,7 @@ This server handles Stripe subscription setup and creation for the app.
 1. Copy `.env.example` to `.env` and set:
    - **STRIPE_SECRET_KEY** – Your Stripe secret key (Dashboard → Developers → API keys). Use `sk_test_...` for development.
    - **STRIPE_PRICE_ID** – Create a Product in Stripe Dashboard with a recurring price of £4.99/month, then paste the Price ID (e.g. `price_...`).
-   - **STRIPE_TRIAL_PERIOD_DAYS** – Optional; default `14`. Used when the app creates a subscription with a free trial (card collected up front; first charge at trial end).
+   - **STRIPE_TRIAL_PERIOD_DAYS** – Optional; default `60`. Used when the app creates a subscription with a free trial (card collected up front; first charge at trial end).
    - **SUPABASE_URL** and **SUPABASE_SERVICE_ROLE_KEY** – Required for **POST /close-account** (in-app “Close account”: cancels Stripe subscription, deletes Stripe customer, removes Supabase auth user). From Supabase Dashboard → Settings → API (use **service_role**, never expose it in the app).
    - **PORT** – Optional; defaults to 4242.
 

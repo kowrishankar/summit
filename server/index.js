@@ -15,7 +15,7 @@ const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const STRIPE_TRIAL_PERIOD_DAYS = Math.min(
   365,
-  Math.max(1, parseInt(process.env.STRIPE_TRIAL_PERIOD_DAYS || '14', 10) || 14)
+  Math.max(1, parseInt(process.env.STRIPE_TRIAL_PERIOD_DAYS || '60', 10) || 60)
 );
 
 const isTestKey = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.startsWith('sk_test_');
