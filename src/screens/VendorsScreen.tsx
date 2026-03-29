@@ -17,6 +17,7 @@ export default function VendorsScreen() {
   const { invoices } = useApp();
   const vendorMap = new Map<string, { name: string; count: number; total: number }>();
   invoices.forEach((inv) => {
+    if ((inv.reviewStatus ?? 'complete') !== 'complete') return;
     const name = inv.extracted.merchantName ?? 'Unknown';
     const existing = vendorMap.get(name);
     const amt = inv.extracted.amount ?? 0;

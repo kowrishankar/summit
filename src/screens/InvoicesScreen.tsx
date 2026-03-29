@@ -17,7 +17,7 @@ import { useAddPreferred } from '../contexts/AddPreferredContext';
 import { formatAmount } from '../utils/currency';
 import { format } from 'date-fns';
 import { groupByReceiptDate } from '../utils/groupByReceiptDate';
-import type { Invoice } from '../types';
+import type { Invoice, ReviewStatus } from '../types';
 import {
   BORDER,
   CARD_BG,
@@ -58,14 +58,28 @@ export default function InvoicesScreen({
     [filtered]
   );
 
+  const reviewStatus = (inv: Invoice): ReviewStatus => inv.reviewStatus ?? 'complete';
+
   const renderItem = ({ item }: { item: Invoice }) => {
     const cat = categories.find((c) => c.id === item.categoryId);
+    const rs = reviewStatus(item);
+    const openRow = () => {
+      if (rs !== 'complete') {
+        const navLike = navigation as {
+          getParent?: () => { getParent?: () => { navigate: (a: string, b?: object) => void }; navigate: (a: string, b?: object) => void } | undefined;
+        };
+        const stackOrTab = navLike.getParent?.();
+        const tabNav = stackOrTab?.getParent?.() ?? stackOrTab;
+        tabNav?.navigate('Add', {
+          screen: 'AddInvoiceRoot',
+          params: { recordId: item.id },
+        });
+        return;
+      }
+      navigation.navigate('InvoiceDetail', { invoiceId: item.id });
+    };
     return (
-      <TouchableOpacity
-        style={styles.row}
-        onPress={() => navigation.navigate('InvoiceDetail', { invoiceId: item.id })}
-        activeOpacity={0.88}
-      >
+      <TouchableOpacity style={styles.row} onPress={openRow} activeOpacity={0.88}>
         <View style={[styles.rowIcon, { backgroundColor: INVOICE_TILE }]}>
           <Ionicons name="document-text-outline" size={22} color={INVOICE_ICON} />
         </View>
@@ -74,6 +88,21 @@ export default function InvoicesScreen({
             <Text style={styles.merchant} numberOfLines={1}>
               {item.extracted.merchantName ?? 'Unknown'}
             </Text>
+            {rs === 'processing' ? (
+              <View style={styles.statusPillProcessing}>
+                <Text style={styles.statusPillProcessingText}>Processing</Text>
+              </View>
+            ) : null}
+            {rs === 'pending_review' ? (
+              <View style={styles.statusPillReview}>
+                <Text style={styles.statusPillReviewText}>Review</Text>
+              </View>
+            ) : null}
+            {rs === 'failed' ? (
+              <View style={styles.statusPillFailed}>
+                <Text style={styles.statusPillFailedText}>Failed</Text>
+              </View>
+            ) : null}
             {item.extracted.isDuplicate ? (
               <View style={styles.dupPill}>
                 <Text style={styles.dupPillText}>Duplicate</Text>
@@ -251,6 +280,27 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   dupPillText: { fontSize: 10, fontWeight: '800', color: '#C2410C', textTransform: 'uppercase' },
+  statusPillProcessing: {
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusPillProcessingText: { fontSize: 10, fontWeight: '800', color: '#3730A3', textTransform: 'uppercase' },
+  statusPillReview: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusPillReviewText: { fontSize: 10, fontWeight: '800', color: '#166534', textTransform: 'uppercase' },
+  statusPillFailed: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusPillFailedText: { fontSize: 10, fontWeight: '800', color: '#B91C1C', textTransform: 'uppercase' },
   meta: { fontSize: 13, color: TEXT_SECONDARY, marginTop: 4, textTransform: 'none' },
   rowAside: { alignItems: 'flex-end', marginLeft: 8 },
   amount: { fontSize: 16, fontWeight: '800', color: RED, letterSpacing: -0.3, textTransform: 'none' },

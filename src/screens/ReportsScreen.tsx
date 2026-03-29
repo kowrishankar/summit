@@ -87,6 +87,7 @@ export default function ReportsScreen() {
   const expensesByMonthDesc = useMemo(() => {
     return monthBuckets.map(({ startStr, endExclusive, label }) => {
       const total = invoices
+        .filter((inv) => (inv.reviewStatus ?? 'complete') === 'complete')
         .filter((inv) => {
           const dateStr = toDateStr(inv.extracted.date);
           return dateStr >= startStr && dateStr < endExclusive;
@@ -99,6 +100,7 @@ export default function ReportsScreen() {
   const incomeByMonthDesc = useMemo(() => {
     return monthBuckets.map(({ startStr, endExclusive, label }) => {
       const total = sales
+        .filter((s) => (s.reviewStatus ?? 'complete') === 'complete')
         .filter((s) => {
           const dateStr = toDateStr(s.extracted.date);
           return dateStr >= startStr && dateStr < endExclusive;
@@ -136,6 +138,7 @@ export default function ReportsScreen() {
   const spendingByMerchantYear = useMemo(() => {
     const map = new Map<string, number>();
     invoices
+      .filter((inv) => (inv.reviewStatus ?? 'complete') === 'complete')
       .filter((inv) => {
         const dateStr = toDateStr(inv.extracted.date);
         return dateStr >= yearStartStr && dateStr < yearEndExclusive;
@@ -166,6 +169,7 @@ export default function ReportsScreen() {
 
     const map = new Map<string, number>();
     invoices
+      .filter((inv) => (inv.reviewStatus ?? 'complete') === 'complete')
       .filter((inv) => {
         const dateStr = toDateStr(inv.extracted.date);
         return dateStr >= yearStartStr && dateStr < yearEndExclusive;

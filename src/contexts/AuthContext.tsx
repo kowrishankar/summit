@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { User, Subscription, AccountKind } from '../types';
 import * as supabaseAuth from '../services/supabaseAuth';
-import { addBusiness, setCurrentBusinessId } from '../services/supabaseData';
+import { addBusiness, setCurrentBusinessId, getBusinessAccounts, updateBusiness } from '../services/supabaseData';
 import { hasActiveAccess, resolveBillingAndSubscription } from '../services/subscription';
 
 interface AuthContextValue {
@@ -27,6 +27,8 @@ interface AuthContextValue {
   logout: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ ok: boolean; token?: string; error?: string }>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
+  /** Individual → business: updates profile and business record. Subscription unchanged. */
+  upgradeToBusiness: (businessName: string, businessAddress?: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -154,6 +156,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return supabaseAuth.updatePassword(newPassword).then((r) => r.ok);
   }, []);
 
+  const upgradeToBusiness = useCallback(
+    async (businessName: string, businessAddress?: string) => {
+      if (!user?.id) throw new Error('Not signed in');
+      const name = businessName.trim();
+      if (!name) throw new Error('Business name is required');
+      const addr = businessAddress?.trim();
+      const list = await getBusinessAccounts(user.id);
+      const first = list[0];
+      if (first) {
+        await updateBusiness(first.id, { name, address: addr || undefined });
+      } else {
+        const b = await addBusiness(user.id, name, addr);
+        await setCurrentBusinessId(user.id, b.id);
+      }
+      const u = await supabaseAuth.updateUserAccountKind('business');
+      setUser(u);
+    },
+    [user?.id]
+  );
+
   const value: AuthContextValue = {
     user,
     subscription,
@@ -167,6 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     logout,
     requestPasswordReset,
     resetPassword,
+    upgradeToBusiness,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

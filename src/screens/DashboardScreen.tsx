@@ -75,6 +75,7 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
       { label: 'W4', total: 0 },
     ];
     invoices.forEach((inv) => {
+      if ((inv.reviewStatus ?? 'complete') !== 'complete') return;
       const d = inv.extracted.date;
       if (!d || d < monthStartStr || d > monthEndStr) return;
       const day = parseInt(d.slice(8, 10), 10);
@@ -89,6 +90,7 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
     const map = new Map<string, number>();
     let total = 0;
     invoices.forEach((inv) => {
+      if ((inv.reviewStatus ?? 'complete') !== 'complete') return;
       const d = inv.extracted.date;
       if (!d || d < monthStartStr || d > monthEndStr) return;
       const amt = inv.extracted.amount ?? 0;
@@ -105,6 +107,7 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
   const incomeTotals = useMemo(() => {
     let salesTotal = 0;
     sales.forEach((s) => {
+      if ((s.reviewStatus ?? 'complete') !== 'complete') return;
       const d = s.extracted.date;
       if (!d || d < monthStartStr || d > monthEndStr) return;
       salesTotal += s.extracted.amount ?? 0;

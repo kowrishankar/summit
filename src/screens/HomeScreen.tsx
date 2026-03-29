@@ -15,6 +15,7 @@ import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useAddPreferred } from '../contexts/AddPreferredContext';
+import type { ReviewStatus } from '../types';
 import { formatAmount } from '../utils/currency';
 import {
   BORDER,
@@ -65,6 +66,8 @@ interface ActivityRow {
   categoryLabel: string;
   verified: boolean;
   isDuplicate?: boolean;
+  /** Open Add flow to review instead of detail when set. */
+  reviewBanner?: 'processing' | 'review' | 'failed';
 }
 
 export default function HomeScreen({
@@ -76,13 +79,46 @@ export default function HomeScreen({
   };
 }) {
   const insets = useSafeAreaInsets();
-  const { spendSummary, invoices, sales, currentBusiness, categories } = useApp();
+  const { spendSummary, invoices, sales, currentBusiness, categories, deleteInvoice, deleteSale } = useApp();
   const { user } = useAuth();
 
   const viewingSharedBusiness = Boolean(
     currentBusiness && user && currentBusiness.userId !== user.id
   );
   const { setPreferredAddType } = useAddPreferred();
+  const sortedIncompleteReceipts = useMemo(() => {
+    type Row = {
+      id: string;
+      kind: 'invoice' | 'sale';
+      fileName: string;
+      status: ReviewStatus;
+      sortKey: string;
+    };
+    const rows: Row[] = [];
+    invoices.forEach((inv) => {
+      const rs = inv.reviewStatus ?? 'complete';
+      if (rs === 'complete') return;
+      rows.push({
+        id: inv.id,
+        kind: 'invoice',
+        fileName: inv.fileName ?? 'Receipt',
+        status: rs,
+        sortKey: inv.updatedAt ?? inv.createdAt,
+      });
+    });
+    sales.forEach((s) => {
+      const rs = s.reviewStatus ?? 'complete';
+      if (rs === 'complete') return;
+      rows.push({
+        id: s.id,
+        kind: 'sale',
+        fileName: s.fileName ?? 'Receipt',
+        status: rs,
+        sortKey: s.updatedAt ?? s.createdAt,
+      });
+    });
+    return rows.sort((a, b) => (a.sortKey < b.sortKey ? 1 : a.sortKey > b.sortKey ? -1 : 0));
+  }, [invoices, sales]);
 
   const primaryCurrency = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -104,6 +140,7 @@ export default function HomeScreen({
     let month = 0;
     let year = 0;
     sales.forEach((s) => {
+      if ((s.reviewStatus ?? 'complete') !== 'complete') return;
       const d = s.extracted.date;
       const amt = s.extracted.amount ?? 0;
       if (d && d >= weekStartStr) week += amt;
@@ -139,6 +176,7 @@ export default function HomeScreen({
     invoices.forEach((inv) => {
       const d = inv.extracted.date;
       if (!d) return;
+      const rs = inv.reviewStatus ?? 'complete';
       const cat = categoryName(inv.categoryId, inv.extracted.category);
       const merchant = inv.extracted.merchantName?.trim() ?? '';
       const pay = inv.extracted.paymentType?.trim();
@@ -171,12 +209,15 @@ export default function HomeScreen({
         categoryLabel: cat,
         verified: Boolean(merchant),
         isDuplicate: inv.extracted.isDuplicate,
+        reviewBanner:
+          rs === 'processing' ? 'processing' : rs === 'pending_review' ? 'review' : rs === 'failed' ? 'failed' : undefined,
       });
     });
 
     sales.forEach((s) => {
       const d = s.extracted.date;
       if (!d) return;
+      const rs = s.reviewStatus ?? 'complete';
       const cat = categoryName(s.categoryId, s.extracted.category);
       const merchant = s.extracted.merchantName?.trim() ?? s.extracted.ownedBy?.trim() ?? '';
       const pay = s.extracted.paymentType?.trim();
@@ -209,11 +250,13 @@ export default function HomeScreen({
         categoryLabel: cat,
         verified: Boolean(merchant),
         isDuplicate: s.extracted.isDuplicate,
+        reviewBanner:
+          rs === 'processing' ? 'processing' : rs === 'pending_review' ? 'review' : rs === 'failed' ? 'failed' : undefined,
       });
     });
 
     rows.sort((a, b) => (a.dateRaw < b.dateRaw ? 1 : a.dateRaw > b.dateRaw ? -1 : 0));
-    return rows.slice(0, 8);
+    return rows.slice(0, 5);
   }, [invoices, sales, categories, currentBusiness?.name]);
 
   const parentNav = () => navigation.getParent?.();
@@ -231,6 +274,20 @@ export default function HomeScreen({
   const goRecords = () => parentNav()?.navigate('Records', { screen: 'InvoicesList' });
 
   const onActivityPress = (row: ActivityRow) => {
+    if (row.reviewBanner) {
+      if (row.kind === 'invoice') {
+        parentNav()?.navigate('Add' as never, {
+          screen: 'AddInvoiceRoot',
+          params: { recordId: row.id },
+        } as never);
+      } else {
+        parentNav()?.navigate('Add' as never, {
+          screen: 'AddSaleRoot',
+          params: { recordId: row.id },
+        } as never);
+      }
+      return;
+    }
     if (row.kind === 'invoice') {
       parentNav()?.navigate('Records', { screen: 'InvoiceDetail', params: { invoiceId: row.id } });
     } else {
@@ -325,6 +382,106 @@ export default function HomeScreen({
         </View>
       </TouchableOpacity>
 
+
+      {sortedIncompleteReceipts.length > 0 && (
+        <View style={styles.pendingSection}>
+          <AppText style={styles.pendingSectionTitle}>Receipts to review</AppText>
+          {sortedIncompleteReceipts.map((p) => {
+            const iconName = p.kind === 'invoice' ? 'document-text-outline' : 'trending-up-outline';
+            const openReview = () => {
+              const tabNav = navigation.getParent?.();
+              if (p.kind === 'invoice') {
+                tabNav?.navigate('Add' as never, {
+                  screen: 'AddInvoiceRoot',
+                  params: { recordId: p.id },
+                } as never);
+              } else {
+                tabNav?.navigate('Add' as never, {
+                  screen: 'AddSaleRoot',
+                  params: { recordId: p.id },
+                } as never);
+              }
+            };
+            const confirmDiscardDraft = () => {
+              Alert.alert(
+                'Discard draft',
+                'This will remove the receipt from your records. If it is still processing, extraction will stop.',
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  {
+                    text: 'Discard',
+                    style: 'destructive',
+                    onPress: () =>
+                      p.kind === 'invoice' ? void deleteInvoice(p.id) : void deleteSale(p.id),
+                  },
+                ]
+              );
+            };
+            const inner = (
+              <View style={styles.pendingCardInner}>
+                <View style={styles.pendingIconWrap}>
+                  <Ionicons name={iconName as 'document-text-outline'} size={22} color={PRIMARY} />
+                </View>
+                <View style={styles.pendingTextCol}>
+                  <View style={styles.pendingTitleRow}>
+                    <AppText style={styles.pendingFileName} numberOfLines={1}>
+                      {p.fileName}
+                    </AppText>
+                    {p.status === 'processing' && (
+                      <View style={styles.badgeProcessing}>
+                        <AppText style={styles.badgeProcessingText}>Processing</AppText>
+                      </View>
+                    )}
+                    {p.status === 'pending_review' && (
+                      <View style={styles.badgeReview}>
+                        <AppText style={styles.badgeReviewText}>Review</AppText>
+                      </View>
+                    )}
+                    {p.status === 'failed' && (
+                      <View style={styles.badgeFailed}>
+                        <AppText style={styles.badgeFailedText}>Failed</AppText>
+                      </View>
+                    )}
+                  </View>
+                  <AppText style={styles.pendingHint}>
+                    {p.status === 'processing' &&
+                      'Still reading your document in the background. Tap ✕ to discard.'}
+                    {p.status === 'pending_review' &&
+                      'Tap the card to confirm or edit, then save. Tap ✕ to discard.'}
+                    {p.status === 'failed' && 'Tap to edit manually and save, or discard this draft.'}
+                  </AppText>
+                </View>
+                <TouchableOpacity
+                  onPress={confirmDiscardDraft}
+                  hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                  style={styles.pendingDismiss}
+                  accessibilityLabel="Discard draft"
+                >
+                  <Ionicons name="close-circle" size={24} color={TEXT_MUTED} />
+                </TouchableOpacity>
+              </View>
+            );
+            if (p.status === 'pending_review' || p.status === 'failed') {
+              return (
+                <TouchableOpacity
+                  key={`${p.kind}-${p.id}`}
+                  style={styles.pendingCard}
+                  activeOpacity={0.88}
+                  onPress={openReview}
+                >
+                  {inner}
+                </TouchableOpacity>
+              );
+            }
+            return (
+              <View key={`${p.kind}-${p.id}`} style={[styles.pendingCard, styles.pendingCardNonInteractive]}>
+                {inner}
+              </View>
+            );
+          })}
+        </View>
+      )}
+
       {/* Quick actions — white card + pastel tiles per design */}
       <View style={styles.quickActionsCard}>
         <AppText style={styles.quickActionsTitle}>Quick Actions</AppText>
@@ -380,6 +537,21 @@ export default function HomeScreen({
                 {row.isDuplicate ? (
                   <View style={styles.activityDupPill}>
                     <AppText style={styles.activityDupPillText}>Dup</AppText>
+                  </View>
+                ) : null}
+                {row.reviewBanner === 'processing' ? (
+                  <View style={styles.activityProcessingPill}>
+                    <AppText style={styles.activityProcessingPillText}>Processing</AppText>
+                  </View>
+                ) : null}
+                {row.reviewBanner === 'review' ? (
+                  <View style={styles.activityReviewPill}>
+                    <AppText style={styles.activityReviewPillText}>Review</AppText>
+                  </View>
+                ) : null}
+                {row.reviewBanner === 'failed' ? (
+                  <View style={styles.activityFailedPill}>
+                    <AppText style={styles.activityFailedPillText}>Failed</AppText>
                   </View>
                 ) : null}
                 {row.verified ? (
@@ -502,6 +674,97 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: PRIMARY,
   },
+  pendingSection: {
+    marginBottom: 20,
+  },
+  pendingSectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT,
+    marginBottom: 10,
+  },
+  pendingCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+    ...shadowCardLight,
+  },
+  pendingCardNonInteractive: {
+    opacity: 0.95,
+  },
+  pendingCardInner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  pendingIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: LAVENDER_SOFT,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  pendingTextCol: { flex: 1, minWidth: 0 },
+  pendingTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 4,
+  },
+  pendingFileName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: TEXT,
+    flexShrink: 1,
+  },
+  badgeProcessing: {
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeProcessingText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#3730A3',
+    textTransform: 'uppercase',
+  },
+  badgeReview: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeReviewText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#166534',
+    textTransform: 'uppercase',
+  },
+  badgeFailed: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeFailedText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B91C1C',
+    textTransform: 'uppercase',
+  },
+  pendingHint: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    lineHeight: 18,
+  },
+  pendingDismiss: { marginLeft: 4, padding: 2 },
   giftBtn: {
     width: 44,
     height: 44,
@@ -677,6 +940,27 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   activityDupPillText: { fontSize: 10, fontWeight: '800', color: '#C2410C' },
+  activityProcessingPill: {
+    backgroundColor: '#E0E7FF',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  activityProcessingPillText: { fontSize: 10, fontWeight: '800', color: '#3730A3' },
+  activityReviewPill: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  activityReviewPillText: { fontSize: 10, fontWeight: '800', color: '#166534' },
+  activityFailedPill: {
+    backgroundColor: '#FEE2E2',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  activityFailedPillText: { fontSize: 10, fontWeight: '800', color: '#B91C1C' },
   verifiedCheck: {
     marginTop: 0,
   },

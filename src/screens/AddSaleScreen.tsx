@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   StyleSheet,
@@ -19,17 +19,19 @@ import { WebView } from 'react-native-webview';
 import ImageView from 'react-native-image-viewing';
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useApp } from '../contexts/AppContext';
 import { useAuth } from '../contexts/AuthContext';
-import { extractFromText, extractFromImageBase64, extractFromMultipleImagesBase64, extractFromPdfBase64 } from '../services/invoiceExtraction';
+import { usePendingExtraction } from '../contexts/PendingExtractionContext';
+import { runReceiptExtraction } from '../services/receiptExtractionRunner';
 import { uploadAttachments } from '../services/attachmentStorage';
-import { renderPdfFirstPageToImageBase64 } from '../services/pdfText';
 import { formatAmount } from '../utils/currency';
 import { maybeSaveCameraImageToGallery } from '../utils/saveCameraImageToGallery';
+import { placeholderProcessingExtracted, placeholderFailedExtracted } from '../utils/placeholderReceipt';
 import type { ExtractedInvoiceData } from '../types';
 import { findDuplicateSaleForSave } from '../utils/receiptDuplicate';
+import { pdfFirstPageAsImageAsset } from '../utils/appendPdfFirstPageAsImageSection';
 import {
   BORDER,
   CARD_BG,
@@ -38,6 +40,7 @@ import {
   PAGE_BG,
   PRIMARY,
   PURPLE_DEEP,
+  RED,
   TEXT,
   TEXT_MUTED,
   TEXT_SECONDARY,
@@ -55,8 +58,20 @@ export default function AddSaleScreen({
 }) {
   const insets = useSafeAreaInsets();
   const { height: winHeight } = useWindowDimensions();
+  const route = useRoute();
+  const nav = useNavigation();
   const { user } = useAuth();
-  const { addSale, updateSale, addCategory, categories, sales, currentBusiness } = useApp();
+  const {
+    addSale,
+    updateSale,
+    deleteSale,
+    addCategory,
+    categories,
+    sales,
+    currentBusiness,
+    loadSales,
+  } = useApp();
+  const { addPendingExtracting, updatePending, removePending, items: pendingItems } = usePendingExtraction();
   const [step, setStep] = useState<
     'choose' | 'preview' | 'extracting' | 'review' | 'edit' | 'saving' | 'done'
   >('choose');
@@ -71,6 +86,132 @@ export default function AddSaleScreen({
   const pendingImageAssetsRef = useRef<Array<{ uri: string; base64?: string; mimeType?: string }>>([]);
   const [previewZoomVisible, setPreviewZoomVisible] = useState(false);
   const [previewZoomIndex, setPreviewZoomIndex] = useState(0);
+
+  const extractionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const backgroundedExtractionRef = useRef(false);
+  const pendingSessionIdRef = useRef<string | null>(null);
+  const draftSaleIdRef = useRef<string | null>(null);
+  const backgroundDbRecordIdRef = useRef<string | null>(null);
+  const extractionStashRef = useRef<
+    { kind: 'success'; data: ExtractedInvoiceData } | { kind: 'error'; message: string } | null
+  >(null);
+
+  const goToDashboardHome = useCallback(() => {
+    const tabNav = nav.getParent?.();
+    (tabNav as { navigate: (n: string, p?: object) => void } | undefined)?.navigate('Dashboard', {
+      screen: 'HomeMain',
+    });
+  }, [nav]);
+
+  useEffect(() => {
+    return () => {
+      if (extractionTimeoutRef.current) clearTimeout(extractionTimeoutRef.current);
+    };
+  }, []);
+
+  const routeRecordId =
+    (route.params as { pendingId?: string; recordId?: string } | undefined)?.pendingId ??
+    (route.params as { recordId?: string } | undefined)?.recordId;
+
+  useEffect(() => {
+    const pid = routeRecordId;
+    if (!pid) return;
+
+    const rec = sales.find((s) => s.id === pid);
+    const rs = rec?.reviewStatus ?? 'complete';
+    if (rec && rs !== 'complete') {
+      draftSaleIdRef.current = pid;
+      pendingSessionIdRef.current = pid;
+      setFileName(rec.fileName ?? '');
+      setDocumentUri(rec.fileUri ?? null);
+      setIsPdf(Boolean(rec.fileName?.toLowerCase().endsWith('.pdf')));
+      const fromPending = pendingItems.find((p) => p.id === pid && p.kind === 'sale');
+      if (fromPending?.imageAssets?.length) {
+        pendingImageAssetsRef.current = [...fromPending.imageAssets];
+        setPendingImageAssets([...fromPending.imageAssets]);
+        setPendingImageAsset(fromPending.imageAssets[0] ?? null);
+      } else if (rec.fileUris?.length) {
+        const assets = rec.fileUris.map((uri) => ({ uri }));
+        pendingImageAssetsRef.current = assets;
+        setPendingImageAssets(assets);
+        setPendingImageAsset(assets[0] ?? null);
+      } else if (rec.fileUri) {
+        const one = { uri: rec.fileUri };
+        pendingImageAssetsRef.current = [one];
+        setPendingImageAssets([one]);
+        setPendingImageAsset(one);
+      } else {
+        pendingImageAssetsRef.current = [];
+        setPendingImageAssets([]);
+        setPendingImageAsset(null);
+      }
+      setExtracted(rec.extracted);
+      setCategoryId(rec.categoryId);
+      if (rs === 'processing') setStep('extracting');
+      else if (rs === 'pending_review') setStep('review');
+      else if (rs === 'failed') {
+        Alert.alert(
+          'Could not read document',
+          'You can edit the details manually and save, or delete this draft from your sales list.'
+        );
+        setStep('review');
+      }
+      nav.setParams({ pendingId: undefined, recordId: undefined } as never);
+      return;
+    }
+
+    const item = pendingItems.find((i) => i.id === pid);
+    if (!item || item.kind !== 'sale') return;
+    if (item.status === 'ready' && item.extracted) {
+      pendingSessionIdRef.current = item.id;
+      draftSaleIdRef.current = item.id;
+      setFileName(item.fileName);
+      setDocumentUri(item.documentUri);
+      setIsPdf(item.isPdf);
+      pendingImageAssetsRef.current = [...item.imageAssets];
+      setPendingImageAssets([...item.imageAssets]);
+      setPendingImageAsset(item.imageAssets[0] ?? null);
+      setExtracted(item.extracted);
+      setCategoryId(null);
+      setStep('review');
+      nav.setParams({ pendingId: undefined, recordId: undefined } as never);
+    } else if (item.status === 'error') {
+      Alert.alert('Could not read document', item.errorMessage ?? 'Extraction failed.');
+      removePending(pid);
+      nav.setParams({ pendingId: undefined, recordId: undefined } as never);
+    }
+  }, [routeRecordId, route.params, pendingItems, sales, nav, removePending]);
+
+  useFocusEffect(
+    useCallback(() => {
+      const id = draftSaleIdRef.current;
+      if (!id) return undefined;
+      const rec = sales.find((s) => s.id === id);
+      if ((rec?.reviewStatus ?? 'complete') !== 'processing') return undefined;
+      const tick = setInterval(() => void loadSales(), 3000);
+      return () => clearInterval(tick);
+    }, [sales, loadSales])
+  );
+
+  useEffect(() => {
+    if (step !== 'extracting') return;
+    const id = draftSaleIdRef.current;
+    if (!id) return;
+    const rec = sales.find((s) => s.id === id);
+    const rs = rec?.reviewStatus ?? 'complete';
+    if (!rec) return;
+    if (rs === 'pending_review') {
+      setExtracted(rec.extracted);
+      setStep('review');
+    } else if (rs === 'failed') {
+      setExtracted(rec.extracted);
+      setStep('review');
+      Alert.alert(
+        'Could not read document',
+        'You can edit the details manually and save, or delete this draft from your sales list.'
+      );
+    }
+  }, [sales, step]);
 
   // OpenAI vision supports JPEG, PNG, GIF, WebP. Convert HEIC/HEIF (iPhone) and other formats to JPEG.
   const getImageBase64ForApi = async (
@@ -118,7 +259,14 @@ export default function AddSaleScreen({
     setStep('preview');
   };
 
-  const addAnotherSection = async () => {
+  const appendSectionAsset = (item: { uri: string; base64?: string; mimeType?: string }) => {
+    const next = [...pendingImageAssetsRef.current, item];
+    pendingImageAssetsRef.current = next;
+    setPendingImageAssets(next);
+    setPendingImageAsset(item);
+  };
+
+  const addAnotherSectionFromCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Allow camera access to add another section.');
@@ -133,13 +281,99 @@ export default function AddSaleScreen({
     const asset = result.assets[0];
     void maybeSaveCameraImageToGallery(asset.uri);
     const item = asset.uri ? { uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? undefined } : null;
-    if (item) {
-      const next = [...pendingImageAssetsRef.current, item];
-      pendingImageAssetsRef.current = next;
-      setPendingImageAssets(next);
-      setPendingImageAsset(item);
-      // Keep documentUri as first section so preview keeps showing the start of the receipt
+    if (item) appendSectionAsset(item);
+  };
+
+  const addAnotherSectionFromLibrary = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission needed', 'Allow access to photos to add another section.');
+      return;
     }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      base64: true,
+      quality: 0.8,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    const asset = result.assets[0];
+    const item = asset.uri ? { uri: asset.uri, base64: asset.base64 ?? undefined, mimeType: asset.mimeType ?? undefined } : null;
+    if (item) appendSectionAsset(item);
+  };
+
+  const addAnotherSectionFromPdf = async () => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets[0]?.uri) return;
+    const pdfUri = result.assets[0].uri;
+    const item = await pdfFirstPageAsImageAsset(pdfUri);
+    if (item) {
+      appendSectionAsset(item);
+      return;
+    }
+    Alert.alert(
+      'PDF as another section',
+      Platform.OS === 'web'
+        ? 'Could not read that PDF. Try a different file or use a photo instead.'
+        : 'On mobile, add each extra page with Take photo or Photo library (e.g. export or screenshot a page). To upload a full PDF on its own, go back and choose Upload PDF from the start.'
+    );
+  };
+
+  const promptAddAnotherSection = () => {
+    const msg =
+      Platform.OS === 'web'
+        ? 'Add the next part in order: camera, library image, or the first page of a PDF (converted to an image).'
+        : 'Add the next part with the camera or from your library. For a PDF page, save or screenshot it to Photos first, then choose it from the library.';
+    const buttons: {
+      text: string;
+      style?: 'cancel' | 'destructive' | 'default';
+      onPress?: () => void;
+    }[] = [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Take photo', onPress: () => void addAnotherSectionFromCamera() },
+      { text: 'Photo library', onPress: () => void addAnotherSectionFromLibrary() },
+    ];
+    if (Platform.OS === 'web') {
+      buttons.push({ text: 'PDF (first page)', onPress: () => void addAnotherSectionFromPdf() });
+    }
+    Alert.alert('Add another section', msg, buttons);
+  };
+
+  const removePendingSectionAt = (index: number) => {
+    const current =
+      pendingImageAssetsRef.current.length > 0
+        ? [...pendingImageAssetsRef.current]
+        : pendingImageAssets.length > 0
+          ? [...pendingImageAssets]
+          : [];
+    if (index < 0 || index >= current.length || current.length < 2) return;
+
+    const next = current.filter((_, i) => i !== index);
+    pendingImageAssetsRef.current = next;
+    setPendingImageAssets(next);
+    setDocumentUri(next[0]?.uri ?? null);
+    setPendingImageAsset(next[Math.min(index, next.length - 1)] ?? null);
+
+    setPreviewZoomIndex((zi) => {
+      if (next.length === 0) return 0;
+      if (index < zi) return zi - 1;
+      if (index === zi) return Math.min(zi, next.length - 1);
+      if (zi >= next.length) return next.length - 1;
+      return zi;
+    });
+  };
+
+  const confirmRemovePreviewSection = (index: number) => {
+    Alert.alert(
+      'Remove this part?',
+      'This section will be removed from the receipt. You can add another section again if you need to.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Remove', style: 'destructive', onPress: () => removePendingSectionAt(index) },
+      ]
+    );
   };
 
   const pickImage = async () => {
@@ -183,6 +417,10 @@ export default function AddSaleScreen({
   };
 
   const selectAnother = () => {
+    draftSaleIdRef.current = null;
+    pendingSessionIdRef.current = null;
+    backgroundDbRecordIdRef.current = null;
+    extractionStashRef.current = null;
     setStep('choose');
     setDocumentUri(null);
     setFileName('');
@@ -195,74 +433,155 @@ export default function AddSaleScreen({
   const confirmAndExtract = async () => {
     const hasImages = pendingImageAssets.length > 0 || pendingImageAsset?.uri || documentUri;
     if (!hasImages && !documentUri) return;
+
+    const assets =
+      pendingImageAssetsRef.current.length > 0
+        ? [...pendingImageAssetsRef.current]
+        : pendingImageAssets.length > 0
+          ? [...pendingImageAssets]
+          : pendingImageAsset
+            ? [pendingImageAsset]
+            : [];
+
+    const snapshot = {
+      isPdf,
+      fileName: fileName || (isPdf ? 'sale.pdf' : 'image.jpg'),
+      documentUri,
+      imageAssets: assets.map((a) => ({ ...a })),
+    };
+
+    const fileUrisToSave =
+      snapshot.imageAssets.length > 1 ? snapshot.imageAssets.map((a) => a.uri) : undefined;
+    const fileUriToSave =
+      snapshot.imageAssets.length > 0 ? snapshot.imageAssets[0].uri : snapshot.documentUri;
+    const urisToUpload = fileUrisToSave?.length
+      ? fileUrisToSave
+      : fileUriToSave
+        ? [fileUriToSave]
+        : [];
+
+    backgroundedExtractionRef.current = false;
+    backgroundDbRecordIdRef.current = null;
+    extractionStashRef.current = null;
+    draftSaleIdRef.current = null;
+
+    if (extractionTimeoutRef.current) clearTimeout(extractionTimeoutRef.current);
+    extractionTimeoutRef.current = setTimeout(() => {
+      void (async () => {
+        try {
+          backgroundedExtractionRef.current = true;
+          const placeholder = placeholderProcessingExtracted();
+          const newSale = await addSale({
+            businessId: '',
+            categoryId: null,
+            source: 'upload',
+            fileName: snapshot.fileName,
+            fileUri: undefined,
+            fileUris: undefined,
+            extracted: placeholder,
+            reviewStatus: 'processing',
+          });
+          const recordId = newSale.id;
+          backgroundDbRecordIdRef.current = recordId;
+          draftSaleIdRef.current = recordId;
+          pendingSessionIdRef.current = recordId;
+
+          if (urisToUpload.length > 0 && user?.id) {
+            const isPdfUpload = snapshot.fileName.toLowerCase().endsWith('.pdf');
+            const urls = await uploadAttachments(
+              user.id,
+              'sales',
+              recordId,
+              urisToUpload,
+              isPdfUpload
+            );
+            await updateSale(recordId, {
+              fileUri: urls[0],
+              fileUris: urls.length > 1 ? urls : undefined,
+            });
+          }
+
+          addPendingExtracting({
+            id: recordId,
+            kind: 'sale',
+            fileName: snapshot.fileName,
+            isPdf: snapshot.isPdf,
+            documentUri: snapshot.documentUri,
+            imageAssets: snapshot.imageAssets,
+          });
+
+          const stashed = extractionStashRef.current;
+          extractionStashRef.current = null;
+          if (stashed?.kind === 'success') {
+            await updateSale(recordId, {
+              extracted: stashed.data,
+              reviewStatus: 'pending_review',
+            });
+            updatePending(recordId, { status: 'ready', extracted: stashed.data });
+          } else if (stashed?.kind === 'error') {
+            await updateSale(recordId, {
+              extracted: placeholderFailedExtracted(),
+              reviewStatus: 'failed',
+            });
+            updatePending(recordId, { status: 'error', errorMessage: stashed.message });
+          }
+
+          Alert.alert(
+            'Working in the background',
+            'We’re still reading your document. You can review it from Home when it’s ready — it’s also saved in your Sales list until you confirm.'
+          );
+          goToDashboardHome();
+        } catch (err) {
+          backgroundedExtractionRef.current = false;
+          Alert.alert(
+            'Could not save draft',
+            err instanceof Error ? err.message : 'Please try again.'
+          );
+          setStep('preview');
+        }
+      })();
+    }, 2_000);
+
     setStep('extracting');
     try {
-      if (isPdf) {
-        const uri = documentUri!;
-        // Prefer sending PDF directly to GPT-4 (supported by API); fallback to web-only image render
-        try {
-          const pdfBase64 = await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          if (pdfBase64) {
-            const data = await extractFromPdfBase64(pdfBase64, fileName ?? 'sale.pdf');
-            setExtracted(data);
-            setStep('review');
-            return;
-          }
-        } catch {
-          // fallback below
-        }
-        const imageResult = await renderPdfFirstPageToImageBase64(uri);
-        if (imageResult) {
-          const data = await extractFromImageBase64(imageResult.base64, imageResult.mimeType);
-          setExtracted(data);
-          setStep('review');
-          return;
-        }
-        Alert.alert(
-          'PDF not supported',
-          'Could not process this PDF. Try the web app or take a photo of the document instead.'
-        );
-        setStep('preview');
-      } else {
-        const assets =
-          pendingImageAssetsRef.current.length > 0
-            ? pendingImageAssetsRef.current
-            : pendingImageAssets.length > 0
-              ? pendingImageAssets
-              : pendingImageAsset
-                ? [pendingImageAsset]
-                : [];
-        if (assets.length === 0 && documentUri) {
-          const { base64, mimeType } = await getImageBase64ForApi(documentUri, undefined, undefined);
-          const data = await extractFromImageBase64(base64, mimeType);
-          setExtracted(data);
-          setStep('review');
-          return;
-        }
-        if (assets.length > 1) {
-          const imagePayloads: Array<{ base64: string; mimeType: string }> = [];
-          for (const a of assets) {
-            const payload = await getImageBase64ForApi(a.uri, a.base64, a.mimeType);
-            imagePayloads.push(payload);
-          }
-          const data = await extractFromMultipleImagesBase64(imagePayloads);
-          setExtracted(data);
-          setStep('review');
-        } else if (assets.length === 1) {
-          const { base64, mimeType } = await getImageBase64ForApi(assets[0].uri, assets[0].base64, assets[0].mimeType);
-          const data = await extractFromImageBase64(base64, mimeType);
-          setExtracted(data);
-          setStep('review');
+      const data = await runReceiptExtraction(snapshot, 'sale');
+      if (extractionTimeoutRef.current) {
+        clearTimeout(extractionTimeoutRef.current);
+        extractionTimeoutRef.current = null;
+      }
+      if (backgroundedExtractionRef.current) {
+        const dbId = backgroundDbRecordIdRef.current;
+        if (dbId) {
+          await updateSale(dbId, { extracted: data, reviewStatus: 'pending_review' });
+          updatePending(dbId, { status: 'ready', extracted: data });
         } else {
-          setExtracted(await extractFromText('No image. Please enter details manually.'));
-          setStep('review');
+          extractionStashRef.current = { kind: 'success', data };
         }
+      } else {
+        setExtracted(data);
+        setStep('review');
       }
     } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Extraction failed.');
-      setStep('preview');
+      if (extractionTimeoutRef.current) {
+        clearTimeout(extractionTimeoutRef.current);
+        extractionTimeoutRef.current = null;
+      }
+      const msg = e instanceof Error ? e.message : 'Extraction failed.';
+      if (backgroundedExtractionRef.current) {
+        const dbId = backgroundDbRecordIdRef.current;
+        if (dbId) {
+          await updateSale(dbId, {
+            extracted: placeholderFailedExtracted(),
+            reviewStatus: 'failed',
+          });
+          updatePending(dbId, { status: 'error', errorMessage: msg });
+        } else {
+          extractionStashRef.current = { kind: 'error', message: msg };
+        }
+      } else {
+        Alert.alert('Error', msg);
+        setStep('preview');
+      }
     }
   };
 
@@ -297,32 +616,64 @@ export default function AddSaleScreen({
           ? [fileUriToSave]
           : [];
 
-      const newSale = await addSale({
-        businessId: '',
-        categoryId: resolvedCategoryId,
-        source: fileName ? 'upload' : 'manual',
-        fileName: fileName || undefined,
-        fileUri: undefined,
-        fileUris: undefined,
-        extracted: extractedPayload,
-      });
-
-      if (urisToUpload.length > 0 && user?.id) {
-        const isPdfUpload = fileName?.toLowerCase().endsWith('.pdf');
-        const urls = await uploadAttachments(
-          user.id,
-          'sales',
-          newSale.id,
-          urisToUpload,
-          isPdfUpload
-        );
-        await updateSale(newSale.id, {
-          fileUri: urls[0],
-          fileUris: urls.length > 1 ? urls : undefined,
+      const draftId = draftSaleIdRef.current;
+      if (draftId) {
+        await updateSale(draftId, {
+          categoryId: resolvedCategoryId,
+          extracted: extractedPayload,
+          reviewStatus: 'complete',
+          fileName: fileName || undefined,
         });
+        const existing = sales.find((s) => s.id === draftId);
+        const hasRemote =
+          Boolean(existing?.fileUri) || Boolean(existing?.fileUris?.length);
+        if (!hasRemote && urisToUpload.length > 0 && user?.id) {
+          const isPdfUpload = fileName?.toLowerCase().endsWith('.pdf');
+          const urls = await uploadAttachments(
+            user.id,
+            'sales',
+            draftId,
+            urisToUpload,
+            isPdfUpload
+          );
+          await updateSale(draftId, {
+            fileUri: urls[0],
+            fileUris: urls.length > 1 ? urls : undefined,
+          });
+        }
+      } else {
+        const newSale = await addSale({
+          businessId: '',
+          categoryId: resolvedCategoryId,
+          source: fileName ? 'upload' : 'manual',
+          fileName: fileName || undefined,
+          fileUri: undefined,
+          fileUris: undefined,
+          extracted: extractedPayload,
+        });
+
+        if (urisToUpload.length > 0 && user?.id) {
+          const isPdfUpload = fileName?.toLowerCase().endsWith('.pdf');
+          const urls = await uploadAttachments(
+            user.id,
+            'sales',
+            newSale.id,
+            urisToUpload,
+            isPdfUpload
+          );
+          await updateSale(newSale.id, {
+            fileUri: urls[0],
+            fileUris: urls.length > 1 ? urls : undefined,
+          });
+        }
       }
 
       setStep('done');
+      if (pendingSessionIdRef.current) {
+        removePending(pendingSessionIdRef.current);
+        pendingSessionIdRef.current = null;
+      }
+      draftSaleIdRef.current = null;
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Save failed.');
       setStep('edit');
@@ -331,7 +682,12 @@ export default function AddSaleScreen({
 
   const save = async () => {
     if (!extracted || !currentBusiness) return;
-    const dup = findDuplicateSaleForSave(sales, currentBusiness.id, extracted);
+    const dup = findDuplicateSaleForSave(
+      sales,
+      currentBusiness.id,
+      extracted,
+      draftSaleIdRef.current ?? undefined
+    );
     if (dup) {
       const refText = extracted.documentReference?.trim();
       const message =
@@ -340,6 +696,33 @@ export default function AddSaleScreen({
           : `A sale with the same date, amount, and merchant may already be saved. You can still save and it will be marked as a duplicate.`;
       Alert.alert('Possible duplicate', message, [
         { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () =>
+            void (async () => {
+              const draftId = draftSaleIdRef.current;
+              if (draftId) {
+                try {
+                  await deleteSale(draftId);
+                } catch (e) {
+                  Alert.alert(
+                    'Could not discard',
+                    e instanceof Error ? e.message : 'Please try again.'
+                  );
+                  return;
+                }
+                if (pendingSessionIdRef.current === draftId) {
+                  removePending(draftId);
+                }
+                pendingSessionIdRef.current = null;
+                draftSaleIdRef.current = null;
+                backgroundDbRecordIdRef.current = null;
+                extractionStashRef.current = null;
+              }
+              finishAndLeave();
+            })(),
+        },
         {
           text: 'Save as duplicate',
           onPress: () =>
@@ -364,6 +747,10 @@ export default function AddSaleScreen({
   };
 
   const finishAndLeave = () => {
+    draftSaleIdRef.current = null;
+    pendingSessionIdRef.current = null;
+    backgroundDbRecordIdRef.current = null;
+    extractionStashRef.current = null;
     setStep('choose');
     setExtracted(null);
     setCategoryId(null);
@@ -379,6 +766,41 @@ export default function AddSaleScreen({
     if (tabNav) tabNav.navigate('Records', { screen: 'SalesList' });
     else navigation.navigate('SalesList');
   };
+
+  const confirmDiscardDraftFromReview = () => {
+    const id = draftSaleIdRef.current;
+    if (!id) return;
+    Alert.alert(
+      'Discard draft?',
+      'This sale will be removed from your records. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () =>
+            void (async () => {
+              try {
+                await deleteSale(id);
+              } catch (e) {
+                Alert.alert('Could not discard', e instanceof Error ? e.message : 'Try again.');
+                return;
+              }
+              if (pendingSessionIdRef.current === id) {
+                removePending(id);
+              }
+              pendingSessionIdRef.current = null;
+              draftSaleIdRef.current = null;
+              backgroundDbRecordIdRef.current = null;
+              extractionStashRef.current = null;
+              finishAndLeave();
+            })(),
+        },
+      ]
+    );
+  };
+
+  const hasIncompleteReviewDraft = Boolean(draftSaleIdRef.current);
 
   if (step === 'choose') {
     return (
@@ -455,22 +877,32 @@ export default function AddSaleScreen({
         {!isPdf && previewSections.length > 0 ? (
           <View style={styles.previewSectionsContainer}>
             {previewSections.map((section, index) => (
-              <TouchableOpacity
-                key={`${section.uri}-${index}`}
-                style={styles.previewSectionWrap}
-                onPress={() => {
-                  setPreviewZoomVisible(true);
-                  setPreviewZoomIndex(index);
-                }}
-                activeOpacity={0.95}
-              >
+              <View key={`${section.uri}-${index}`} style={styles.previewSectionWrap}>
                 {previewSections.length > 1 && (
-                  <Text style={styles.previewSectionLabel}>
-                    Part {index + 1} of {previewSections.length}
-                  </Text>
+                  <View style={styles.previewSectionHeader}>
+                    <Text style={styles.previewSectionLabel}>
+                      Part {index + 1} of {previewSections.length}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => confirmRemovePreviewSection(index)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Remove part ${index + 1}`}
+                    >
+                      <Ionicons name="trash-outline" size={20} color={RED} />
+                    </TouchableOpacity>
+                  </View>
                 )}
-                <Image source={{ uri: section.uri }} style={styles.previewSectionImage} resizeMode="contain" />
-              </TouchableOpacity>
+                <TouchableOpacity
+                  activeOpacity={0.95}
+                  onPress={() => {
+                    setPreviewZoomVisible(true);
+                    setPreviewZoomIndex(index);
+                  }}
+                >
+                  <Image source={{ uri: section.uri }} style={styles.previewSectionImage} resizeMode="contain" />
+                </TouchableOpacity>
+              </View>
             ))}
             <Text style={styles.previewZoomHintInline}>Tap any part to zoom</Text>
           </View>
@@ -497,11 +929,15 @@ export default function AddSaleScreen({
           </View>
         ) : null}
         {!isPdf && (
-          <TouchableOpacity style={styles.addSectionBtn} onPress={addAnotherSection} activeOpacity={0.88}>
+          <TouchableOpacity style={styles.addSectionBtn} onPress={promptAddAnotherSection} activeOpacity={0.88}>
             <Ionicons name="add-circle-outline" size={22} color={SALE_ICON} style={styles.addSectionIcon} />
             <View style={styles.addSectionTextCol}>
               <Text style={styles.addSectionBtnText}>Add another section</Text>
-              <Text style={styles.addSectionBtnSub}>For long receipts, capture the next part in order</Text>
+              <Text style={styles.addSectionBtnSub}>
+                {Platform.OS === 'web'
+                  ? 'Camera, photo library, or PDF (first page)'
+                  : 'Camera or photo library — use library for PDF pages saved as images'}
+              </Text>
             </View>
           </TouchableOpacity>
         )}
@@ -603,6 +1039,15 @@ export default function AddSaleScreen({
           <TouchableOpacity style={styles.secondaryBtn} onPress={() => setStep('edit')} activeOpacity={0.88}>
             <Text style={styles.secondaryBtnText}>Edit details</Text>
           </TouchableOpacity>
+          {hasIncompleteReviewDraft ? (
+            <TouchableOpacity
+              style={styles.discardDraftBtn}
+              onPress={confirmDiscardDraftFromReview}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.discardDraftBtnText}>Discard draft</Text>
+            </TouchableOpacity>
+          ) : null}
         </View>
       </ScrollView>
     );
@@ -697,6 +1142,15 @@ export default function AddSaleScreen({
             )}
           </LinearGradient>
         </TouchableOpacity>
+        {hasIncompleteReviewDraft && step !== 'saving' ? (
+          <TouchableOpacity
+            style={styles.discardDraftBtn}
+            onPress={confirmDiscardDraftFromReview}
+            activeOpacity={0.88}
+          >
+            <Text style={styles.discardDraftBtnText}>Discard draft</Text>
+          </TouchableOpacity>
+        ) : null}
       </ScrollView>
     );
   }
@@ -814,13 +1268,19 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
     ...shadowCardLight,
   },
+  previewSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    backgroundColor: MUTED_CARD,
+  },
   previewSectionLabel: {
     fontSize: 12,
     fontWeight: '700',
     color: TEXT_MUTED,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: MUTED_CARD,
+    flex: 1,
     textTransform: 'none',
   },
   previewSectionImage: { width: '100%', height: 260, backgroundColor: MUTED_CARD },
@@ -891,6 +1351,13 @@ const styles = StyleSheet.create({
     borderColor: BORDER,
   },
   secondaryBtnText: { color: TEXT_MUTED, fontSize: 16, fontWeight: '600', textTransform: 'none' },
+  discardDraftBtn: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  discardDraftBtnText: { color: RED, fontSize: 16, fontWeight: '600', textTransform: 'none' },
   extractingCard: {
     backgroundColor: CARD_BG,
     borderRadius: 24,

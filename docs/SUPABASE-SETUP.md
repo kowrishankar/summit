@@ -37,18 +37,7 @@ CREATE TABLE categories (
 );
 
 -- Invoices (expenses)
-CREATE TABLE invoices (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  business_id UUID NOT NULL REFERENCES business_accounts(id) ON DELETE CASCADE,
-  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
-  source TEXT NOT NULL CHECK (source IN ('upload', 'manual')),
-  file_uri TEXT,
-  file_uris TEXT[],
-  file_name TEXT,
-  extracted JSONB NOT NULL DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+r
 
 -- Sales (income)
 CREATE TABLE sales (
@@ -60,6 +49,7 @@ CREATE TABLE sales (
   file_uris TEXT[],
   file_name TEXT,
   extracted JSONB NOT NULL DEFAULT '{}',
+  review_status TEXT NOT NULL DEFAULT 'complete' CHECK (review_status IN ('complete', 'processing', 'pending_review', 'failed')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -132,6 +122,17 @@ CREATE POLICY "Users can manage own preferences"
 
 -- Storage bucket for invoice/sale attachments (optional; create in Dashboard if you use Storage)
 -- Storage → New bucket → name: attachments, public or private with RLS
+```
+
+**Existing projects** (tables already created without `review_status`): run this once in **SQL Editor**:
+
+```sql
+ALTER TABLE invoices
+  ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'complete'
+  CHECK (review_status IN ('complete', 'processing', 'pending_review', 'failed'));
+ALTER TABLE sales
+  ADD COLUMN IF NOT EXISTS review_status TEXT NOT NULL DEFAULT 'complete'
+  CHECK (review_status IN ('complete', 'processing', 'pending_review', 'failed'));
 ```
 
 ### Team access (invite collaborators)

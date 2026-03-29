@@ -85,6 +85,16 @@ export async function updatePassword(newPassword: string): Promise<{ ok: boolean
   return { ok: true };
 }
 
+/** Updates `user_metadata.account_kind` (e.g. individual → business). No billing change. */
+export async function updateUserAccountKind(kind: AccountKind): Promise<User> {
+  const { data, error } = await supabase.auth.updateUser({
+    data: { account_kind: kind },
+  });
+  if (error) throw new Error(error.message);
+  if (!data.user) throw new Error('Could not update account');
+  return mapAuthUser(data.user);
+}
+
 function parseAccountKind(raw: unknown): AccountKind | undefined {
   if (raw === 'individual' || raw === 'business' || raw === 'practice') return raw;
   return undefined;

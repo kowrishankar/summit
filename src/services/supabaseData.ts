@@ -7,6 +7,7 @@ import type {
   Sale,
   Subscription,
   ExtractedInvoiceData,
+  ReviewStatus,
 } from '../types';
 
 const MONTHLY_PRICE_PENCE = 1499;
@@ -175,6 +176,7 @@ export async function addInvoice(
     file_uris: inv.fileUris ?? null,
     file_name: inv.fileName ?? null,
     extracted: inv.extracted as object,
+    review_status: (inv.reviewStatus ?? 'complete') as ReviewStatus,
     created_at: now,
     updated_at: now,
   });
@@ -183,6 +185,7 @@ export async function addInvoice(
     ...inv,
     id,
     businessId,
+    reviewStatus: inv.reviewStatus ?? 'complete',
     createdAt: now,
     updatedAt: now,
   };
@@ -196,6 +199,7 @@ export async function updateInvoice(id: string, patch: Partial<Invoice>): Promis
   if (patch.fileUris !== undefined) row.file_uris = patch.fileUris;
   if (patch.fileName !== undefined) row.file_name = patch.fileName;
   if (patch.extracted !== undefined) row.extracted = patch.extracted as object;
+  if (patch.reviewStatus !== undefined) row.review_status = patch.reviewStatus;
   const { error } = await supabase.from('invoices').update(row).eq('id', id);
   if (error) throw new Error(error.message);
 }
@@ -231,6 +235,7 @@ export async function addSale(
     file_uris: sale.fileUris ?? null,
     file_name: sale.fileName ?? null,
     extracted: sale.extracted as object,
+    review_status: (sale.reviewStatus ?? 'complete') as ReviewStatus,
     created_at: now,
     updated_at: now,
   });
@@ -239,6 +244,7 @@ export async function addSale(
     ...sale,
     id,
     businessId,
+    reviewStatus: sale.reviewStatus ?? 'complete',
     createdAt: now,
     updatedAt: now,
   };
@@ -252,6 +258,7 @@ export async function updateSale(id: string, patch: Partial<Sale>): Promise<void
   if (patch.fileUris !== undefined) row.file_uris = patch.fileUris;
   if (patch.fileName !== undefined) row.file_name = patch.fileName;
   if (patch.extracted !== undefined) row.extracted = patch.extracted as object;
+  if (patch.reviewStatus !== undefined) row.review_status = patch.reviewStatus;
   const { error } = await supabase.from('sales').update(row).eq('id', id);
   if (error) throw new Error(error.message);
 }
@@ -375,6 +382,7 @@ function rowToInvoice(r: Record<string, unknown>): Invoice {
     fileUris: (r.file_uris as string[] | undefined) ?? undefined,
     fileName: r.file_name as string | undefined,
     extracted: (r.extracted as ExtractedInvoiceData) ?? {},
+    reviewStatus: (r.review_status as ReviewStatus | undefined) ?? 'complete',
     createdAt: (r.created_at as string).replace('Z', 'Z'),
     updatedAt: (r.updated_at as string).replace('Z', 'Z'),
   };
@@ -390,6 +398,7 @@ function rowToSale(r: Record<string, unknown>): Sale {
     fileUris: (r.file_uris as string[] | undefined) ?? undefined,
     fileName: r.file_name as string | undefined,
     extracted: (r.extracted as ExtractedInvoiceData) ?? {},
+    reviewStatus: (r.review_status as ReviewStatus | undefined) ?? 'complete',
     createdAt: (r.created_at as string).replace('Z', 'Z'),
     updatedAt: (r.updated_at as string).replace('Z', 'Z'),
   };

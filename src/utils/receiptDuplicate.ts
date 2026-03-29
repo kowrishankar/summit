@@ -29,24 +29,32 @@ export type ReceiptDuplicateMatch<T extends Invoice | Sale = Invoice> = {
 export function findDuplicateInvoiceByReference(
   invoices: Invoice[],
   businessId: string,
-  documentReference: string | undefined
+  documentReference: string | undefined,
+  excludeRecordId?: string
 ): Invoice | undefined {
   const r = normRef(documentReference);
   if (!r) return undefined;
   return invoices.find(
-    (inv) => inv.businessId === businessId && normRef(inv.extracted.documentReference) === r
+    (inv) =>
+      inv.id !== excludeRecordId &&
+      inv.businessId === businessId &&
+      normRef(inv.extracted.documentReference) === r
   );
 }
 
 export function findDuplicateSaleByReference(
   sales: Sale[],
   businessId: string,
-  documentReference: string | undefined
+  documentReference: string | undefined,
+  excludeRecordId?: string
 ): Sale | undefined {
   const r = normRef(documentReference);
   if (!r) return undefined;
   return sales.find(
-    (s) => s.businessId === businessId && normRef(s.extracted.documentReference) === r
+    (s) =>
+      s.id !== excludeRecordId &&
+      s.businessId === businessId &&
+      normRef(s.extracted.documentReference) === r
   );
 }
 
@@ -54,12 +62,14 @@ export function findDuplicateSaleByReference(
 export function findDuplicateInvoiceByFingerprint(
   invoices: Invoice[],
   businessId: string,
-  data: Pick<ExtractedInvoiceData, 'amount' | 'date' | 'merchantName'>
+  data: Pick<ExtractedInvoiceData, 'amount' | 'date' | 'merchantName'>,
+  excludeRecordId?: string
 ): Invoice | undefined {
   const m = normMerchant(data.merchantName);
   const d = normDate(data.date);
   if (!m || !d) return undefined;
   return invoices.find((inv) => {
+    if (inv.id === excludeRecordId) return false;
     if (inv.businessId !== businessId) return false;
     if (!sameAmount(data.amount, inv.extracted.amount ?? 0)) return false;
     if (normDate(inv.extracted.date) !== d) return false;
@@ -71,12 +81,14 @@ export function findDuplicateInvoiceByFingerprint(
 export function findDuplicateSaleByFingerprint(
   sales: Sale[],
   businessId: string,
-  data: Pick<ExtractedInvoiceData, 'amount' | 'date' | 'merchantName'>
+  data: Pick<ExtractedInvoiceData, 'amount' | 'date' | 'merchantName'>,
+  excludeRecordId?: string
 ): Sale | undefined {
   const m = normMerchant(data.merchantName);
   const d = normDate(data.date);
   if (!m || !d) return undefined;
   return sales.find((s) => {
+    if (s.id === excludeRecordId) return false;
     if (s.businessId !== businessId) return false;
     if (!sameAmount(data.amount, s.extracted.amount ?? 0)) return false;
     if (normDate(s.extracted.date) !== d) return false;
@@ -88,11 +100,17 @@ export function findDuplicateSaleByFingerprint(
 export function findDuplicateInvoiceForSave(
   invoices: Invoice[],
   businessId: string,
-  extracted: ExtractedInvoiceData
+  extracted: ExtractedInvoiceData,
+  excludeRecordId?: string
 ): ReceiptDuplicateMatch<Invoice> | null {
-  const byRef = findDuplicateInvoiceByReference(invoices, businessId, extracted.documentReference);
+  const byRef = findDuplicateInvoiceByReference(
+    invoices,
+    businessId,
+    extracted.documentReference,
+    excludeRecordId
+  );
   if (byRef) return { kind: 'reference', record: byRef };
-  const byFp = findDuplicateInvoiceByFingerprint(invoices, businessId, extracted);
+  const byFp = findDuplicateInvoiceByFingerprint(invoices, businessId, extracted, excludeRecordId);
   if (byFp) return { kind: 'fingerprint', record: byFp };
   return null;
 }
@@ -100,11 +118,17 @@ export function findDuplicateInvoiceForSave(
 export function findDuplicateSaleForSave(
   sales: Sale[],
   businessId: string,
-  extracted: ExtractedInvoiceData
+  extracted: ExtractedInvoiceData,
+  excludeRecordId?: string
 ): ReceiptDuplicateMatch<Sale> | null {
-  const byRef = findDuplicateSaleByReference(sales, businessId, extracted.documentReference);
+  const byRef = findDuplicateSaleByReference(
+    sales,
+    businessId,
+    extracted.documentReference,
+    excludeRecordId
+  );
   if (byRef) return { kind: 'reference', record: byRef };
-  const byFp = findDuplicateSaleByFingerprint(sales, businessId, extracted);
+  const byFp = findDuplicateSaleByFingerprint(sales, businessId, extracted, excludeRecordId);
   if (byFp) return { kind: 'fingerprint', record: byFp };
   return null;
 }

@@ -278,6 +278,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const yearStart = startOfYear(now);
   const spendSummary: SpendSummary = invoices.reduce(
     (acc, inv) => {
+      if ((inv.reviewStatus ?? 'complete') !== 'complete') return acc;
       const d = inv.extracted.date;
       const amt = inv.extracted.amount ?? 0;
       const tax = inv.extracted.vatAmount ?? 0;

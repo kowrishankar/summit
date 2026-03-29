@@ -40,6 +40,7 @@ import {
   PURPLE_DEEP,
   RED,
   TEXT,
+  TEXT_SECONDARY,
   TEXT_MUTED,
   shadowCard,
   shadowCardLight,
@@ -47,8 +48,15 @@ import {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout, subscription, refreshSubscription, isTeamMember, hasActiveSubscription } =
-    useAuth();
+  const {
+    user,
+    logout,
+    subscription,
+    refreshSubscription,
+    isTeamMember,
+    hasActiveSubscription,
+    upgradeToBusiness,
+  } = useAuth();
   const { currentBusiness, updateBusiness, reloadBusinessData } = useApp();
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
@@ -65,6 +73,13 @@ export default function SettingsScreen() {
   const [acceptBusy, setAcceptBusy] = useState(false);
   const [claimHandoffToken, setClaimHandoffToken] = useState('');
   const [claimHandoffBusy, setClaimHandoffBusy] = useState(false);
+  const [upgradeBizName, setUpgradeBizName] = useState('');
+  const [upgradeBizAddress, setUpgradeBizAddress] = useState('');
+  const [becomeBusinessBusy, setBecomeBusinessBusy] = useState(false);
+  const [practiceClientName, setPracticeClientName] = useState('');
+  const [practiceClientEmail, setPracticeClientEmail] = useState('');
+  const [practiceClientAddress, setPracticeClientAddress] = useState('');
+  const [practiceInviteBusy, setPracticeInviteBusy] = useState(false);
 
   const loadTeam = useCallback(async () => {
     if (!user?.id || isTeamMember) return;
@@ -162,7 +177,93 @@ export default function SettingsScreen() {
     (subscription.status === 'active' || subscription.status === 'trialing') &&
     !subscription.cancelAtPeriodEnd;
 
-  const showTeamManagement = !isTeamMember && hasActiveSubscription;
+  const rawKind = user?.accountKind;
+
+  const accountTypeLabel =
+    rawKind === 'practice'
+      ? 'Practice plan'
+      : rawKind === 'business'
+        ? 'Business plan'
+        : rawKind === 'individual'
+          ? 'Individual plan'
+          : 'Business plan';
+
+  const accountTypeDescription =
+    rawKind === 'practice'
+      ? 'You manage client businesses under your subscription. Inviting a client business does not add a separate charge—their workspace is included in your practice plan.'
+      : rawKind === 'business'
+        ? 'You can invite teammates to access your invoices and sales. Your subscription covers your workspace.'
+        : rawKind === 'individual'
+          ? 'Personal expense tracking. Switch to a business account anytime at no extra cost to invite collaborators.'
+          : 'Your workspace supports invoices, sales, and inviting teammates. This account predates plan labels in your profile.';
+
+  const showBecomeBusiness = !isTeamMember && rawKind === 'individual';
+
+  const showTeamManagement =
+    !isTeamMember &&
+    hasActiveSubscription &&
+    (rawKind === 'business' || rawKind === 'practice' || rawKind === undefined);
+
+  const showPracticeClientInvite =
+    !isTeamMember && hasActiveSubscription && rawKind === 'practice';
+
+  const handleBecomeBusiness = async () => {
+    const name = currentBusiness ? businessName.trim() : upgradeBizName.trim();
+    const addr = currentBusiness ? businessAddress.trim() : upgradeBizAddress.trim();
+    if (!name) {
+      Alert.alert(
+        'Business name required',
+        currentBusiness
+          ? 'Enter your business name in Business details below (or in the fields above if you have not saved yet).'
+          : 'Enter your business name.'
+      );
+      return;
+    }
+    setBecomeBusinessBusy(true);
+    try {
+      await upgradeToBusiness(name, addr || undefined);
+      await reloadBusinessData();
+      Alert.alert(
+        'Business account enabled',
+        'Your subscription and price stay the same. You can invite people under Team & collaborators.'
+      );
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not update account.');
+    } finally {
+      setBecomeBusinessBusy(false);
+    }
+  };
+
+  const handlePracticeInviteClient = async () => {
+    const n = practiceClientName.trim();
+    const em = practiceClientEmail.trim().toLowerCase();
+    if (!n || !em) {
+      Alert.alert('Required', 'Enter the client business name and the email they will use to sign up.');
+      return;
+    }
+    if (!user?.id) return;
+    setPracticeInviteBusy(true);
+    try {
+      const { invite } = await practiceHandoff.createClientBusinessWithHandoff(
+        user.id,
+        n,
+        em,
+        practiceClientAddress.trim() || undefined
+      );
+      setPracticeClientName('');
+      setPracticeClientEmail('');
+      setPracticeClientAddress('');
+      await reloadBusinessData();
+      Alert.alert(
+        'Send claim code to client',
+        `They sign up or sign in with ${em}, then Settings → Claim a business from your accountant. Their workspace is included in your practice subscription—no extra fee.\n\n${invite.token}`
+      );
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not create invite.');
+    } finally {
+      setPracticeInviteBusy(false);
+    }
+  };
 
   const handleCreateInvite = async () => {
     const email = inviteEmail.trim().toLowerCase();
@@ -285,7 +386,69 @@ export default function SettingsScreen() {
                 <AppText style={styles.accountValue}>{user?.email ?? '—'}</AppText>
               </View>
             </View>
+            <View style={[styles.accountRow, styles.accountRowSpaced]}>
+              <View style={styles.iconTileTeal}>
+                <Ionicons name="shield-checkmark-outline" size={22} color="#fff" />
+              </View>
+              <View style={styles.accountTextCol}>
+                <AppText style={styles.accountLabel}>Account type</AppText>
+                <AppText style={styles.accountValueStrong}>{accountTypeLabel}</AppText>
+                <AppText style={styles.accountTypeHint}>{accountTypeDescription}</AppText>
+              </View>
+            </View>
           </View>
+
+          {showBecomeBusiness && (
+            <View style={styles.card}>
+              <AppText style={styles.cardTitle}>Become a business account</AppText>
+              <AppText style={styles.cardHint}>
+                Use a business profile to invite others to your workspace. Your subscription and price do not change.
+              </AppText>
+              {currentBusiness ? (
+                <AppText style={styles.cardHintMuted}>
+                  We will use the business name and address in “Business details” below. Update those fields if needed,
+                  then tap the button—you do not have to press Save first.
+                </AppText>
+              ) : (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Business name"
+                    value={upgradeBizName}
+                    onChangeText={setUpgradeBizName}
+                    placeholderTextColor={TEXT_MUTED}
+                  />
+                  <TextInput
+                    style={[styles.input, styles.inputMultiline]}
+                    placeholder="Business address (optional)"
+                    value={upgradeBizAddress}
+                    onChangeText={setUpgradeBizAddress}
+                    placeholderTextColor={TEXT_MUTED}
+                    multiline
+                    numberOfLines={2}
+                  />
+                </>
+              )}
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => void handleBecomeBusiness()}
+                disabled={becomeBusinessBusy}
+                style={styles.gradientBtnTouchable}
+              >
+                <LinearGradient
+                  colors={[PURPLE, PURPLE_DEEP]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.gradientBtn}
+                >
+                  <Ionicons name="briefcase-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                  <AppText style={styles.gradientBtnText}>
+                    {becomeBusinessBusy ? 'Updating…' : 'Switch to business account'}
+                  </AppText>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
 
           {/* Accept team invite (own login) */}
           <View style={styles.card}>
@@ -403,12 +566,67 @@ export default function SettingsScreen() {
             )}
           </View>
 
+          {showPracticeClientInvite && (
+            <View style={styles.card}>
+              <AppText style={styles.cardTitle}>Invite a client business</AppText>
+              <AppText style={styles.cardHint}>
+                Add a workspace for a client. They sign up with the email you enter and claim it with the code we
+                show. You keep access to their invoices and sales under your practice plan—no extra subscription for
+                them.
+              </AppText>
+              <TextInput
+                style={styles.input}
+                placeholder="Client business name"
+                value={practiceClientName}
+                onChangeText={setPracticeClientName}
+                placeholderTextColor={TEXT_MUTED}
+              />
+              <TextInput
+                style={[styles.input, styles.inputMultiline]}
+                placeholder="Client business address (optional)"
+                value={practiceClientAddress}
+                onChangeText={setPracticeClientAddress}
+                placeholderTextColor={TEXT_MUTED}
+                multiline
+                numberOfLines={2}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Client email (they sign up with this)"
+                value={practiceClientEmail}
+                onChangeText={setPracticeClientEmail}
+                placeholderTextColor={TEXT_MUTED}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+              />
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => void handlePracticeInviteClient()}
+                disabled={practiceInviteBusy}
+                style={styles.gradientBtnTouchable}
+              >
+                <LinearGradient
+                  colors={[PURPLE, PURPLE_DEEP]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.gradientBtn}
+                >
+                  <Ionicons name="mail-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                  <AppText style={styles.gradientBtnText}>
+                    {practiceInviteBusy ? 'Creating…' : 'Create invite & claim code'}
+                  </AppText>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {showTeamManagement && (
             <View style={styles.card}>
               <AppText style={styles.cardTitle}>Team & collaborators</AppText>
               <AppText style={styles.cardHint}>
-                Invite an accountant or teammate with their own email and password. They will see the same
-                businesses, invoices, and sales.
+                Invite people with their own email and password. They can access your businesses, invoices, and sales
+                (same as you). Useful for staff or an accountant.
               </AppText>
               <TextInput
                 style={styles.input}
@@ -692,6 +910,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  accountRowSpaced: {
+    marginTop: 18,
+    paddingTop: 18,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BORDER,
+  },
   iconTilePurple: {
     width: 48,
     height: 48,
@@ -721,6 +945,34 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: TEXT,
+  },
+  accountValueStrong: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: TEXT,
+  },
+  iconTileTeal: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    backgroundColor: '#0D9488',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+  },
+  accountTypeHint: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: TEXT_SECONDARY,
+    marginTop: 8,
+    lineHeight: 19,
+  },
+  cardHintMuted: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: TEXT_SECONDARY,
+    marginBottom: 12,
+    lineHeight: 18,
   },
   loader: { marginVertical: 16 },
   listRow: {

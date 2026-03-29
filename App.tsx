@@ -7,6 +7,7 @@ import { StripeProvider } from '@stripe/stripe-react-native';
 import StripeDeepLinkHandler from './src/components/StripeDeepLinkHandler';
 import { AuthProvider, useAuth } from './src/contexts/AuthContext';
 import { AppProvider } from './src/contexts/AppContext';
+import { PendingExtractionProvider } from './src/contexts/PendingExtractionContext';
 import AuthStack from './src/navigation/AuthStack';
 import MainTabs from './src/navigation/MainTabs';
 import SubscribeScreen from './src/screens/SubscribeScreen';
@@ -69,7 +70,9 @@ function RootNavigator() {
 
   return (
     <AppProvider>
-      <MainTabs />
+      <PendingExtractionProvider>
+        <MainTabs />
+      </PendingExtractionProvider>
     </AppProvider>
   );
 }

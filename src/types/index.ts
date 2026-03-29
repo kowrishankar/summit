@@ -35,6 +35,9 @@ export interface ExtractedInvoiceData {
   lineItems: LineItem[];
 }
 
+/** Saved row lifecycle: background extraction uses `processing` → `pending_review` until the user confirms, then `complete`. */
+export type ReviewStatus = 'complete' | 'processing' | 'pending_review' | 'failed';
+
 export interface Invoice {
   id: string;
   businessId: string;
@@ -44,6 +47,7 @@ export interface Invoice {
   fileUris?: string[]; // long receipt: multiple images in order
   fileName?: string;
   extracted: ExtractedInvoiceData;
+  reviewStatus?: ReviewStatus;
   createdAt: string;
   updatedAt: string;
 }
@@ -58,6 +62,7 @@ export interface Sale {
   fileUris?: string[];
   fileName?: string;
   extracted: ExtractedInvoiceData;
+  reviewStatus?: ReviewStatus;
   createdAt: string;
   updatedAt: string;
 }
