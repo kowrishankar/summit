@@ -11,6 +11,38 @@ export const PLAN_AMOUNT_PENCE: Record<AccountKind, number> = {
   practice: 1499,
 };
 
+/** Free-trial length when using “Start with free trial” (must match server tier defaults). */
+export const TRIAL_DAYS_DEFAULT: Record<AccountKind, number> = {
+  individual: 7,
+  business: 14,
+  practice: 30,
+};
+
+function clampTrialDays(n: number): number {
+  return Math.min(365, Math.max(1, n));
+}
+
+/**
+ * Trial days for subscribe UI and fallbacks. Override per tier with
+ * EXPO_PUBLIC_STRIPE_TRIAL_DAYS_INDIVIDUAL, _BUSINESS, _PRACTICE, or legacy EXPO_PUBLIC_STRIPE_TRIAL_DAYS for all.
+ */
+export function getTrialDaysForAccountKind(kind: AccountKind | undefined): number {
+  const k: AccountKind = kind ?? 'individual';
+  const legacy = process.env.EXPO_PUBLIC_STRIPE_TRIAL_DAYS;
+  const tierEnv =
+    k === 'individual'
+      ? process.env.EXPO_PUBLIC_STRIPE_TRIAL_DAYS_INDIVIDUAL
+      : k === 'business'
+        ? process.env.EXPO_PUBLIC_STRIPE_TRIAL_DAYS_BUSINESS
+        : process.env.EXPO_PUBLIC_STRIPE_TRIAL_DAYS_PRACTICE;
+  const raw = tierEnv ?? legacy;
+  if (raw !== undefined && String(raw).trim() !== '') {
+    const parsed = parseInt(String(raw), 10);
+    if (!Number.isNaN(parsed)) return clampTrialDays(parsed);
+  }
+  return TRIAL_DAYS_DEFAULT[k];
+}
+
 export function getPlanForAccountKind(kind: AccountKind | undefined): {
   label: string;
   amountPence: number;

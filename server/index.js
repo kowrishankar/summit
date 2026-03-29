@@ -18,16 +18,29 @@ const STRIPE_PRICE_ID_PRACTICE = process.env.STRIPE_PRICE_ID_PRACTICE || STRIPE_
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
 const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
-const STRIPE_TRIAL_PERIOD_DAYS = Math.min(
-  365,
-  Math.max(1, parseInt(process.env.STRIPE_TRIAL_PERIOD_DAYS || '60', 10) || 60)
-);
 
 const isTestKey = STRIPE_SECRET_KEY && STRIPE_SECRET_KEY.startsWith('sk_test_');
 
 function normalizeAccountKind(raw) {
   if (raw === 'business' || raw === 'practice') return raw;
   return 'individual';
+}
+
+/** Legacy single env `STRIPE_TRIAL_PERIOD_DAYS` applies to any tier when tier-specific env is unset. */
+function trialPeriodDaysForAccountKind(accountKind) {
+  const k = normalizeAccountKind(accountKind);
+  const legacy = process.env.STRIPE_TRIAL_PERIOD_DAYS;
+  const cap = (n) => Math.min(365, Math.max(1, n));
+  if (k === 'business') {
+    const raw = process.env.STRIPE_TRIAL_DAYS_BUSINESS ?? legacy ?? '14';
+    return cap(parseInt(raw, 10) || 14);
+  }
+  if (k === 'practice') {
+    const raw = process.env.STRIPE_TRIAL_DAYS_PRACTICE ?? legacy ?? '30';
+    return cap(parseInt(raw, 10) || 30);
+  }
+  const raw = process.env.STRIPE_TRIAL_DAYS_INDIVIDUAL ?? legacy ?? '7';
+  return cap(parseInt(raw, 10) || 7);
 }
 
 function priceIdForAccountKind(kind) {
@@ -64,7 +77,7 @@ if (!STRIPE_PRICE_ID_INDIVIDUAL) {
   );
 } else {
   console.log(
-    `Stripe: ${isTestKey ? 'TEST' : 'LIVE'} key. Individual: ${STRIPE_PRICE_ID_INDIVIDUAL}; Business: ${STRIPE_PRICE_ID_BUSINESS}; Practice: ${STRIPE_PRICE_ID_PRACTICE}. Trial: ${STRIPE_TRIAL_PERIOD_DAYS} day(s).`
+    `Stripe: ${isTestKey ? 'TEST' : 'LIVE'} key. Individual: ${STRIPE_PRICE_ID_INDIVIDUAL}; Business: ${STRIPE_PRICE_ID_BUSINESS}; Practice: ${STRIPE_PRICE_ID_PRACTICE}. Trial days: ${trialPeriodDaysForAccountKind('individual')}/${trialPeriodDaysForAccountKind('business')}/${trialPeriodDaysForAccountKind('practice')} (individual/business/practice).`
   );
 }
 
@@ -257,6 +270,8 @@ app.post('/create-trial-subscription', async (req, res) => {
       return res.status(500).json({ error: 'Stripe price IDs not configured' });
     }
 
+    const trialDays = trialPeriodDaysForAccountKind(accountKind);
+
     const existing = await findExistingSubscriptionForPrice(customerId, priceId);
     if (existing) {
       const currentPeriodEnd = existing.current_period_end
@@ -271,7 +286,7 @@ app.post('/create-trial-subscription', async (req, res) => {
         status: existing.status,
         currentPeriodEnd,
         currentPeriodStart,
-        trialPeriodDays: STRIPE_TRIAL_PERIOD_DAYS,
+        trialPeriodDays: trialDays,
         stripeMode: isTestKey ? 'test' : 'live',
       });
     }
@@ -294,7 +309,7 @@ app.post('/create-trial-subscription', async (req, res) => {
     const subscription = await stripe.subscriptions.create({
       customer: customerId,
       items: [{ price: priceId }],
-      trial_period_days: STRIPE_TRIAL_PERIOD_DAYS,
+      trial_period_days: trialDays,
       default_payment_method: paymentMethodId,
       payment_settings: { save_default_payment_method: 'on_subscription' },
     });
@@ -312,7 +327,7 @@ app.post('/create-trial-subscription', async (req, res) => {
       status: subscription.status,
       currentPeriodEnd,
       currentPeriodStart,
-      trialPeriodDays: STRIPE_TRIAL_PERIOD_DAYS,
+      trialPeriodDays: trialDays,
       stripeMode: isTestKey ? 'test' : 'live',
     });
   } catch (e) {

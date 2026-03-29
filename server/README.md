@@ -8,7 +8,7 @@ This server handles Stripe subscription setup and creation for the app.
    - **STRIPE_SECRET_KEY** – Your Stripe secret key (Dashboard → Developers → API keys). Use `sk_test_...` for development.
    - **STRIPE_PRICE_ID** – Fallback Price ID if tier-specific IDs below are omitted. Create Products in Stripe for **Personal** (£4.99/mo), **Business** (£9.99/mo), and **Practice** (£14.99/mo), then set:
    - **STRIPE_PRICE_ID_INDIVIDUAL**, **STRIPE_PRICE_ID_BUSINESS**, **STRIPE_PRICE_ID_PRACTICE** – Price IDs (`price_...`) for each tier. If any are unset, **STRIPE_PRICE_ID** is used for that tier (fine for early testing with one price).
-   - **STRIPE_TRIAL_PERIOD_DAYS** – Optional; default `60`. Used when the app creates a subscription with a free trial (card collected up front; first charge at trial end).
+   - **STRIPE_TRIAL_DAYS_INDIVIDUAL** (default `7`), **STRIPE_TRIAL_DAYS_BUSINESS** (default `14`), **STRIPE_TRIAL_DAYS_PRACTICE** (default `30`) – Trial length for `/create-trial-subscription`. **STRIPE_TRIAL_PERIOD_DAYS** (legacy) applies to a tier only when that tier’s env is unset.
    - **SUPABASE_URL** and **SUPABASE_SERVICE_ROLE_KEY** – Required for **POST /close-account** (in-app “Close account”: cancels Stripe subscription, deletes Stripe customer, removes Supabase auth user). From Supabase Dashboard → Settings → API (use **service_role**, never expose it in the app).
    - **PORT** – Optional; defaults to 4242.
 

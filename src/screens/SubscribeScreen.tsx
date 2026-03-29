@@ -16,14 +16,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useStripe } from '@stripe/stripe-react-native';
 import { useAuth } from '../contexts/AuthContext';
 import { isStripePublishableKeyConfigured } from '../config/stripeEnv';
-import { STRIPE_TRIAL_DAYS } from '../config/trial';
 import {
   prepareSubscriptionPayment,
   confirmSubscription,
   createSetupIntent,
   createTrialSubscription,
 } from '../services/stripeApi';
-import { getPlanForAccountKind } from '../config/pricing';
+import { getPlanForAccountKind, getTrialDaysForAccountKind } from '../config/pricing';
 import { createSubscriptionFromStripe, hasActiveAccess } from '../services/subscription';
 import {
   BORDER,
@@ -103,6 +102,7 @@ function SubscribeScreenWithStripe() {
   const [loading, setLoading] = useState(false);
   const [startWithTrial, setStartWithTrial] = useState(false);
   const plan = getPlanForAccountKind(user?.accountKind);
+  const trialDays = getTrialDaysForAccountKind(user?.accountKind);
 
   useEffect(() => {
     void AsyncStorage.getItem(TRIAL_PREF_KEY).then((v) => {
@@ -155,9 +155,10 @@ function SubscribeScreenWithStripe() {
         }
 
         const trialRes = await createTrialSubscription(customerId, user.accountKind);
+        const effectiveTrialDays = trialRes.trialPeriodDays ?? trialDays;
         const currentPeriodEnd =
           trialRes.currentPeriodEnd ??
-          new Date(Date.now() + STRIPE_TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+          new Date(Date.now() + effectiveTrialDays * 24 * 60 * 60 * 1000).toISOString();
         const currentPeriodStart =
           trialRes.currentPeriodStart ?? new Date().toISOString();
 
@@ -284,8 +285,8 @@ function SubscribeScreenWithStripe() {
           <View style={styles.trialTextCol}>
             <AppText style={styles.trialTitle}>Start with a free trial</AppText>
             <AppText style={styles.trialHint}>
-              {STRIPE_TRIAL_DAYS} days free, then {plan.priceDisplay}/month. Add a card now — you won’t be charged
-              until the trial ends.
+              {trialDays} days free, then {plan.priceDisplay}/month. Add a card now — you won’t be charged until the
+              trial ends.
             </AppText>
           </View>
           <Switch
@@ -316,7 +317,7 @@ function SubscribeScreenWithStripe() {
             <ActivityIndicator color="#fff" />
           ) : (
             <AppText style={styles.buttonText}>
-              {startWithTrial ? `Start ${STRIPE_TRIAL_DAYS}-day free trial` : 'Subscribe now'}
+              {startWithTrial ? `Start ${trialDays}-day free trial` : 'Subscribe now'}
             </AppText>
           )}
         </TouchableOpacity>

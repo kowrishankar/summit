@@ -1,8 +1,5 @@
 /**
- * Shown in signup/subscribe copy. Keep in sync with server `STRIPE_TRIAL_PERIOD_DAYS`.
- * Optional: set EXPO_PUBLIC_STRIPE_TRIAL_DAYS in .env so UI matches production server.
+ * Subscribe / signup trial copy. Defaults: Personal 7d, Business 14d, Practice 30d.
+ * Server: STRIPE_TRIAL_DAYS_INDIVIDUAL, STRIPE_TRIAL_DAYS_BUSINESS, STRIPE_TRIAL_DAYS_PRACTICE (or legacy STRIPE_TRIAL_PERIOD_DAYS).
  */
-export const STRIPE_TRIAL_DAYS = Math.min(
-  365,
-  Math.max(1, parseInt(process.env.EXPO_PUBLIC_STRIPE_TRIAL_DAYS || '60', 10) || 60)
-);
+export { getTrialDaysForAccountKind, TRIAL_DAYS_DEFAULT } from './pricing';
