@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
 
 const app = express();
 app.use(cors({ origin: true }));
@@ -10,6 +11,8 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const stripe = new Stripe(STRIPE_SECRET_KEY);
 const STRIPE_PRICE_ID = process.env.STRIPE_PRICE_ID;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
+const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
+const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 const STRIPE_TRIAL_PERIOD_DAYS = Math.min(
   365,
   Math.max(1, parseInt(process.env.STRIPE_TRIAL_PERIOD_DAYS || '14', 10) || 14)
@@ -84,6 +87,95 @@ app.post(
 );
 
 app.use(express.json());
+
+function getSupabaseAdmin() {
+  if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) return null;
+  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+}
+
+/** Cancel subscriptions and delete Stripe customer (removes payment methods and billing profile in Stripe). */
+async function purgeStripeCustomer(customerId) {
+  if (!customerId) return;
+  const subs = await stripe.subscriptions.list({ customer: customerId, limit: 100 });
+  for (const sub of subs.data) {
+    const terminal = sub.status === 'canceled' || sub.status === 'incomplete_expired';
+    if (!terminal) {
+      try {
+        await stripe.subscriptions.cancel(sub.id);
+      } catch (e) {
+        console.warn('[close-account] cancel subscription', sub.id, e?.message);
+      }
+    }
+  }
+  try {
+    await stripe.customers.del(customerId);
+  } catch (e) {
+    if (e.code !== 'resource_missing') throw e;
+  }
+}
+
+/**
+ * Permanently delete the signed-in user: Stripe cleanup from DB-linked IDs, then Supabase Auth delete (CASCADE removes app data).
+ * Body: { accessToken: string } — user JWT from supabase.auth.getSession().
+ */
+app.post('/close-account', async (req, res) => {
+  const admin = getSupabaseAdmin();
+  if (!admin) {
+    return res.status(503).json({
+      error:
+        'Account closure is not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY on this server (Supabase Dashboard → Settings → API).',
+    });
+  }
+  const accessToken =
+    typeof req.body?.accessToken === 'string' ? req.body.accessToken.trim() : '';
+  if (!accessToken) {
+    return res.status(400).json({ error: 'accessToken is required' });
+  }
+  const {
+    data: { user },
+    error: authErr,
+  } = await admin.auth.getUser(accessToken);
+  if (authErr || !user) {
+    return res.status(401).json({ error: 'Invalid or expired session. Sign in again.' });
+  }
+  const userId = user.id;
+  try {
+    const { data: subRow, error: subErr } = await admin
+      .from('subscriptions')
+      .select('stripe_customer_id, stripe_subscription_id')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (subErr) {
+      console.error('[close-account] subscriptions', subErr);
+      return res.status(500).json({ error: 'Could not read billing data. Try again.' });
+    }
+    if (subRow?.stripe_customer_id) {
+      if (!STRIPE_SECRET_KEY) {
+        return res.status(503).json({ error: 'Stripe is not configured; cannot remove billing data.' });
+      }
+      await purgeStripeCustomer(subRow.stripe_customer_id);
+    } else if (subRow?.stripe_subscription_id && STRIPE_SECRET_KEY) {
+      try {
+        await stripe.subscriptions.cancel(subRow.stripe_subscription_id);
+      } catch (e) {
+        if (e.code !== 'resource_missing') {
+          console.warn('[close-account] cancel subscription', e?.message);
+        }
+      }
+    }
+    const { error: delErr } = await admin.auth.admin.deleteUser(userId);
+    if (delErr) {
+      console.error('[close-account] deleteUser', delErr);
+      return res.status(500).json({ error: delErr.message || 'Could not delete account.' });
+    }
+    return res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error('[close-account]', e);
+    return res.status(500).json({ error: e.message || 'Account closure failed.' });
+  }
+});
 
 /** Health check – hit this from your phone browser to confirm the server is reachable (e.g. http://YOUR_IP:4242/health) */
 app.get('/health', (req, res) => {

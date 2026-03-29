@@ -34,6 +34,22 @@ export async function getTeamOwnerIdsForMember(memberUserId: string): Promise<st
   return [...new Set(ids)];
 }
 
+/** Collaborators on this owner’s account (e.g. practice user after a client claims a handoff). */
+export async function getMemberUserIdsForAccountOwner(ownerUserId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('account_access_members')
+    .select('member_user_id')
+    .eq('owner_user_id', ownerUserId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    if (__DEV__) {
+      console.warn('[getMemberUserIdsForAccountOwner]', error.message);
+    }
+    return [];
+  }
+  return [...new Set((data ?? []).map((r: { member_user_id: string }) => r.member_user_id))];
+}
+
 // ---- Business accounts ----
 export async function getBusinessAccounts(userId: string): Promise<BusinessAccount[]> {
   const ownerIds = await getTeamOwnerIdsForMember(userId);
@@ -279,6 +295,28 @@ export async function getSubscription(userId: string): Promise<Subscription | nu
     .maybeSingle();
   if (error) throw new Error(error.message);
   return data ? rowToSubscription(data) : null;
+}
+
+/**
+ * When the user owns an account that lists a paying collaborator (e.g. practice after claim_business_handoff),
+ * returns that collaborator’s subscription row. SECURITY DEFINER RPC — works even if subscriptions RLS blocks direct SELECT.
+ */
+export async function getSponsorSubscriptionViaRpc(): Promise<Subscription | null> {
+  const { data, error } = await supabase.rpc('get_sponsor_subscription_for_claimed_owner');
+  if (error) {
+    if (__DEV__) {
+      console.warn(
+        '[getSponsorSubscriptionViaRpc]',
+        error.message,
+        '(Add function: docs/SUPABASE-SETUP.md — get_sponsor_subscription_for_claimed_owner.)'
+      );
+    }
+    return null;
+  }
+  if (data == null || (typeof data === 'object' && data !== null && Object.keys(data as object).length === 0)) {
+    return null;
+  }
+  return rowToSubscription(data as Record<string, unknown>);
 }
 
 export async function upsertSubscriptionFromStripe(

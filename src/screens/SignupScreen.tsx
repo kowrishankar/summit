@@ -39,33 +39,37 @@ const KIND_OPTIONS: {
 }[] = [
   {
     kind: 'individual',
-    title: 'Just for me',
-    body: 'Track personal income and spending.',
+    title: 'Personal',
+    body: 'Track your own income and spending. After sign-up you’ll subscribe to Summit. No inviting others or joining teams.',
     icon: 'person-outline',
   },
   {
     kind: 'business',
-    title: 'Business owner',
-    body: 'I run a business and want invoices & sales in one place.',
+    title: 'Business',
+    body: 'Invoices and sales for your business. After sign-up you’ll subscribe to Summit. Solo account—no invites or joining teams.',
     icon: 'storefront-outline',
   },
   {
     kind: 'practice',
-    title: 'Practice (accountant)',
-    body: 'I manage multiple clients and hand businesses to owners when ready.',
+    title: 'Practice',
+    body: 'Accountants: add client businesses at no extra fee on your plan; clients claim with a code. You subscribe for your practice workspace.',
     icon: 'briefcase-outline',
   },
 ];
 
+type SignupPath = 'standard' | 'claim';
+
 export default function SignupScreen({ navigation }: { navigation: { navigate: (s: string) => void } }) {
   const insets = useSafeAreaInsets();
   const { signup } = useAuth();
+  const [signupPath, setSignupPath] = useState<SignupPath>('standard');
   const [accountKind, setAccountKind] = useState<AccountKind>('individual');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
+  const [claimCode, setClaimCode] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleSignup = async () => {
@@ -81,16 +85,24 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
       Alert.alert('Error', 'Passwords do not match.');
       return;
     }
-    if (accountKind === 'business' && !businessName.trim()) {
+    if (signupPath === 'claim') {
+      if (!claimCode.trim()) {
+        Alert.alert('Error', 'Enter the claim code your accountant sent you.');
+        return;
+      }
+    } else if (accountKind === 'business' && !businessName.trim()) {
       Alert.alert('Error', 'Please enter your business name.');
       return;
     }
     setLoading(true);
     try {
       const result = await signup(email.trim(), password, {
-        accountKind,
-        businessName: accountKind === 'practice' ? undefined : businessName.trim() || undefined,
-        businessAddress: accountKind === 'practice' ? undefined : businessAddress.trim() || undefined,
+        accountKind: signupPath === 'claim' ? 'business' : accountKind,
+        businessName:
+          signupPath === 'claim' ? undefined : accountKind === 'practice' ? undefined : businessName.trim() || undefined,
+        businessAddress:
+          signupPath === 'claim' ? undefined : accountKind === 'practice' ? undefined : businessAddress.trim() || undefined,
+        claimHandoffToken: signupPath === 'claim' ? claimCode.trim() : undefined,
       });
       if (!result.ok) {
         Alert.alert('Error', result.error ?? 'Signup failed.');
@@ -116,35 +128,88 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
         showsVerticalScrollIndicator={false}
       >
         <AppText style={styles.title}>Create account</AppText>
-        <AppText style={styles.subtitle}>Tell us how you’ll use Summit</AppText>
+        <AppText style={styles.subtitle}>
+          {signupPath === 'claim'
+            ? 'Claim the workspace your accountant set up — no separate Summit payment.'
+            : 'Tell us how you’ll use Summit'}
+        </AppText>
 
-        <AppText style={styles.sectionLabel}>I’m signing up as</AppText>
-        {KIND_OPTIONS.map((opt) => {
-          const selected = accountKind === opt.kind;
-          return (
-            <TouchableOpacity
-              key={opt.kind}
-              style={[styles.kindCard, selected && styles.kindCardSelected]}
-              onPress={() => setAccountKind(opt.kind)}
-              activeOpacity={0.88}
-            >
-              <View style={[styles.kindIconWrap, selected && styles.kindIconWrapSelected]}>
-                <Ionicons name={opt.icon} size={22} color={selected ? '#fff' : PRIMARY} />
-              </View>
-              <View style={styles.kindTextCol}>
-                <AppText style={styles.kindTitle}>{opt.title}</AppText>
-                <AppText style={styles.kindBody}>{opt.body}</AppText>
-              </View>
-              {selected ? (
-                <Ionicons name="checkmark-circle" size={24} color={PRIMARY} />
-              ) : (
-                <View style={styles.kindRadioOuter}>
-                  <View style={styles.kindRadioInner} />
-                </View>
-              )}
-            </TouchableOpacity>
-          );
-        })}
+        <AppText style={styles.sectionLabel}>How are you joining?</AppText>
+        <TouchableOpacity
+          style={[styles.pathCard, signupPath === 'standard' && styles.pathCardSelected]}
+          onPress={() => setSignupPath('standard')}
+          activeOpacity={0.88}
+        >
+          <View style={[styles.kindIconWrap, signupPath === 'standard' && styles.kindIconWrapSelected]}>
+            <Ionicons name="person-add-outline" size={22} color={signupPath === 'standard' ? '#fff' : PRIMARY} />
+          </View>
+          <View style={styles.kindTextCol}>
+            <AppText style={styles.kindTitle}>New Account</AppText>
+            <AppText style={styles.kindBody}>Personal, business, or practice—then subscribe (except claim path)</AppText>
+          </View>
+          {signupPath === 'standard' ? (
+            <Ionicons name="checkmark-circle" size={24} color={PRIMARY} />
+          ) : (
+            <View style={styles.kindRadioOuter}>
+              <View style={styles.kindRadioInner} />
+            </View>
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.pathCard, signupPath === 'claim' && styles.pathCardSelected]}
+          onPress={() => setSignupPath('claim')}
+          activeOpacity={0.88}
+        >
+          <View style={[styles.kindIconWrap, signupPath === 'claim' && styles.kindIconWrapSelected]}>
+            <Ionicons name="ribbon-outline" size={22} color={signupPath === 'claim' ? '#fff' : PRIMARY} />
+          </View>
+          <View style={styles.kindTextCol}>
+            <AppText style={styles.kindTitle}>Invited by Practice</AppText>
+            <AppText style={styles.kindBody}>
+              Your accountant already pays for your workspace on their practice plan. Use the email they used for you
+              and the claim code they sent.
+            </AppText>
+          </View>
+          {signupPath === 'claim' ? (
+            <Ionicons name="checkmark-circle" size={24} color={PRIMARY} />
+          ) : (
+            <View style={styles.kindRadioOuter}>
+              <View style={styles.kindRadioInner} />
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {signupPath === 'standard' && (
+          <>
+            <AppText style={styles.sectionLabel}>I’m signing up as</AppText>
+            {KIND_OPTIONS.map((opt) => {
+              const selected = accountKind === opt.kind;
+              return (
+                <TouchableOpacity
+                  key={opt.kind}
+                  style={[styles.kindCard, selected && styles.kindCardSelected]}
+                  onPress={() => setAccountKind(opt.kind)}
+                  activeOpacity={0.88}
+                >
+                  <View style={[styles.kindIconWrap, selected && styles.kindIconWrapSelected]}>
+                    <Ionicons name={opt.icon} size={22} color={selected ? '#fff' : PRIMARY} />
+                  </View>
+                  <View style={styles.kindTextCol}>
+                    <AppText style={styles.kindTitle}>{opt.title}</AppText>
+                    <AppText style={styles.kindBody}>{opt.body}</AppText>
+                  </View>
+                  {selected ? (
+                    <Ionicons name="checkmark-circle" size={24} color={PRIMARY} />
+                  ) : (
+                    <View style={styles.kindRadioOuter}>
+                      <View style={styles.kindRadioInner} />
+                    </View>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </>
+        )}
 
         <TextInput
           style={styles.input}
@@ -175,10 +240,32 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
           placeholderTextColor={TEXT_MUTED}
         />
 
-        {accountKind !== 'practice' && (
+        {signupPath === 'claim' && (
+          <>
+            <AppText style={styles.sectionLabel}>Claim code</AppText>
+            <TextInput
+              style={styles.input}
+              placeholder="Paste claim code from your accountant"
+              value={claimCode}
+              onChangeText={setClaimCode}
+              placeholderTextColor={TEXT_MUTED}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.practiceInfo}>
+              <Ionicons name="information-circle-outline" size={22} color={PRIMARY} style={styles.practiceInfoIcon} />
+              <AppText style={styles.practiceInfoText}>
+                Your sign-up email must match the one your accountant entered for you. After you create your account,
+                we’ll claim the business in one step — you won’t be asked to pay for Summit yourself.
+              </AppText>
+            </View>
+          </>
+        )}
+
+        {signupPath === 'standard' && accountKind !== 'practice' && (
           <>
             <AppText style={styles.sectionLabel}>
-              {accountKind === 'business' ? 'Business details' : 'Business (optional)'}
+              {accountKind === 'business' ? 'Business details' : 'Business (optional for personal)'}
             </AppText>
             <TextInput
               style={styles.input}
@@ -202,13 +289,13 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
           </>
         )}
 
-        {accountKind === 'practice' && (
+        {signupPath === 'standard' && accountKind === 'practice' && (
           <View style={styles.practiceInfo}>
             <Ionicons name="information-circle-outline" size={22} color={PRIMARY} style={styles.practiceInfoIcon} />
             <AppText style={styles.practiceInfoText}>
-              After you subscribe, open Switch business → Add client business. You’ll enter each client’s email and
-              get a claim code to send them. Once they claim, they become the business owner and you keep access to
-              help with tax and books.
+              After you subscribe, add client businesses from Switch business (no extra fee per client on your plan).
+              Each client gets a claim code to sign up without paying for Summit themselves. You can edit their
+              workspace name and address anytime.
             </AppText>
           </View>
         )}
@@ -228,7 +315,7 @@ export default function SignupScreen({ navigation }: { navigation: { navigate: (
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <AppText style={styles.buttonText}>Sign Up</AppText>
+              <AppText style={styles.buttonText}>{signupPath === 'claim' ? 'Create account & claim' : 'Sign Up'}</AppText>
             )}
           </LinearGradient>
         </TouchableOpacity>
@@ -267,6 +354,20 @@ const styles = StyleSheet.create({
     color: TEXT,
     marginBottom: 10,
     marginTop: 8,
+  },
+  pathCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: CARD_BG,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: BORDER,
+  },
+  pathCardSelected: {
+    borderColor: PRIMARY,
+    backgroundColor: MUTED_CARD,
   },
   kindCard: {
     flexDirection: 'row',

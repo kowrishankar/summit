@@ -27,15 +27,40 @@ export async function resolveBillingAndSubscription(authUserId: string): Promise
   billingUserId: string;
 }> {
   const ownerIds = await supabaseData.getTeamOwnerIdsForMember(authUserId);
-  const ownSub = await supabaseData.getSubscription(authUserId);
+  let ownSub: Subscription | null = null;
+  try {
+    ownSub = await supabaseData.getSubscription(authUserId);
+  } catch {
+    ownSub = null;
+  }
   if (hasActiveAccess(ownSub)) {
     return { subscription: ownSub, billingUserId: authUserId };
   }
   for (const oid of ownerIds) {
-    const s = await supabaseData.getSubscription(oid);
-    if (hasActiveAccess(s)) {
-      return { subscription: s, billingUserId: oid };
+    try {
+      const s = await supabaseData.getSubscription(oid);
+      if (hasActiveAccess(s)) {
+        return { subscription: s, billingUserId: oid };
+      }
+    } catch {
+      /* RLS or network — try other owners / RPC */
     }
+  }
+  // Client claimed a business: practice is a collaborator on the client’s account; use practice subscription.
+  const membersOnMyAccount = await supabaseData.getMemberUserIdsForAccountOwner(authUserId);
+  for (const mid of membersOnMyAccount) {
+    try {
+      const s = await supabaseData.getSubscription(mid);
+      if (hasActiveAccess(s)) {
+        return { subscription: s, billingUserId: mid };
+      }
+    } catch {
+      /* subscriptions RLS often blocks reading another user’s row — RPC below fixes that */
+    }
+  }
+  const rpcSub = await supabaseData.getSponsorSubscriptionViaRpc();
+  if (rpcSub && hasActiveAccess(rpcSub)) {
+    return { subscription: rpcSub, billingUserId: rpcSub.userId };
   }
   return { subscription: ownSub, billingUserId: authUserId };
 }

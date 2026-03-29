@@ -8,6 +8,7 @@ This server handles Stripe subscription setup and creation for the app.
    - **STRIPE_SECRET_KEY** – Your Stripe secret key (Dashboard → Developers → API keys). Use `sk_test_...` for development.
    - **STRIPE_PRICE_ID** – Create a Product in Stripe Dashboard with a recurring price of £4.99/month, then paste the Price ID (e.g. `price_...`).
    - **STRIPE_TRIAL_PERIOD_DAYS** – Optional; default `14`. Used when the app creates a subscription with a free trial (card collected up front; first charge at trial end).
+   - **SUPABASE_URL** and **SUPABASE_SERVICE_ROLE_KEY** – Required for **POST /close-account** (in-app “Close account”: cancels Stripe subscription, deletes Stripe customer, removes Supabase auth user). From Supabase Dashboard → Settings → API (use **service_role**, never expose it in the app).
    - **PORT** – Optional; defaults to 4242.
 
 2. Install and run:
@@ -27,6 +28,7 @@ This server handles Stripe subscription setup and creation for the app.
 - **POST /create-subscription** – Body: `{ "customerId": "cus_..." }`. Creates a £4.99/month subscription using the customer’s payment method. Returns `subscriptionId`, `customerId`, `currentPeriodEnd`, and optionally `clientSecret` if the first charge needs confirmation (e.g. 3DS).
 - **POST /confirm-subscription** – Body: `{ "subscriptionId": "sub_..." }`. Returns subscription details including `customerId` and `currentPeriodEnd`.
 - **POST /create-portal-session** – Body: `{ "customerId": "cus_...", "returnUrl": "https://..." }`. Creates a Stripe Customer Portal session; returns `{ url }` to open in the browser so the customer can manage subscription, payment method, and invoices.
+- **POST /close-account** – Body: `{ "accessToken": "<Supabase JWT>" }`. Verifies the session, cancels subscriptions and deletes the Stripe customer linked from `subscriptions` for that user (if any), then deletes the Supabase auth user (database rows cascade). Returns `{ ok: true }`.
 - **POST /webhook** – Stripe webhooks. Configure in Dashboard (e.g. `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed`, `customer.subscription.updated`, `customer.subscription.deleted`). Set `STRIPE_WEBHOOK_SECRET` for signature verification.
 
 ## Deploying to production

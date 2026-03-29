@@ -13,6 +13,7 @@ import {
   Switch,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useScrollToTop } from '@react-navigation/native';
@@ -23,10 +24,9 @@ import {
   cancelSubscriptionAtPeriodEnd,
   formatPrice,
 } from '../services/subscription';
-import * as teamAccess from '../services/teamAccess';
 import * as practiceHandoff from '../services/practiceHandoff';
-import type { AccountAccessInvite, AccountAccessMember } from '../types';
-import { createPortalSession } from '../services/stripeApi';
+import { closeUserAccount, createPortalSession } from '../services/stripeApi';
+import { getAccessToken } from '../services/supabaseAuth';
 import {
   getSaveCameraPhotosToGallery,
   setSaveCameraPhotosToGallery,
@@ -65,13 +65,6 @@ export default function SettingsScreen() {
   const [cancelling, setCancelling] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [saveCameraToGallery, setSaveCameraToGallery] = useState(false);
-  const [invites, setInvites] = useState<AccountAccessInvite[]>([]);
-  const [members, setMembers] = useState<AccountAccessMember[]>([]);
-  const [teamLoading, setTeamLoading] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteBusy, setInviteBusy] = useState(false);
-  const [acceptToken, setAcceptToken] = useState('');
-  const [acceptBusy, setAcceptBusy] = useState(false);
   const [claimHandoffToken, setClaimHandoffToken] = useState('');
   const [claimHandoffBusy, setClaimHandoffBusy] = useState(false);
   const [upgradeBizName, setUpgradeBizName] = useState('');
@@ -81,31 +74,7 @@ export default function SettingsScreen() {
   const [practiceClientEmail, setPracticeClientEmail] = useState('');
   const [practiceClientAddress, setPracticeClientAddress] = useState('');
   const [practiceInviteBusy, setPracticeInviteBusy] = useState(false);
-
-  const loadTeam = useCallback(async () => {
-    if (!user?.id || isTeamMember) return;
-    setTeamLoading(true);
-    try {
-      const [inv, mem] = await Promise.all([
-        teamAccess.listInvitesForOwner(user.id),
-        teamAccess.listMembersForOwner(user.id),
-      ]);
-      setInvites(inv);
-      setMembers(mem);
-    } catch (e) {
-      if (__DEV__) {
-        console.warn('[Settings] Team access load failed (run Supabase team migration?)', e);
-      }
-      setInvites([]);
-      setMembers([]);
-    } finally {
-      setTeamLoading(false);
-    }
-  }, [user?.id, isTeamMember]);
-
-  useEffect(() => {
-    void loadTeam();
-  }, [loadTeam]);
+  const [closeAccountBusy, setCloseAccountBusy] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -141,6 +110,58 @@ export default function SettingsScreen() {
       { text: 'Log out', style: 'destructive', onPress: logout },
     ]);
   };
+
+  const runCloseAccount = useCallback(async () => {
+    const token = await getAccessToken();
+    if (!token) {
+      Alert.alert('Session expired', 'Sign in again, then try closing your account from Settings.');
+      return;
+    }
+    setCloseAccountBusy(true);
+    try {
+      await closeUserAccount(token);
+      try {
+        await logout();
+      } catch {
+        /* user may already be deleted server-side */
+      }
+      Alert.alert('Account closed', 'Your Summit account has been removed.');
+    } catch (e) {
+      Alert.alert('Could not close account', e instanceof Error ? e.message : 'Try again later.');
+    } finally {
+      setCloseAccountBusy(false);
+    }
+  }, [logout]);
+
+  const handleCloseAccount = useCallback(() => {
+    Alert.alert(
+      'Close your account?',
+      isTeamMember
+        ? 'This removes your Summit login and access to shared workspaces. It does not cancel another account’s subscription.'
+        : 'This permanently deletes your Summit account, businesses, invoices, and sales. Any subscription on your login is cancelled immediately in Stripe and your Stripe customer is removed. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Are you sure?',
+              'You will be signed out and cannot recover this account.',
+              [
+                { text: 'Keep account', style: 'cancel' },
+                {
+                  text: 'Close account',
+                  style: 'destructive',
+                  onPress: () => void runCloseAccount(),
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
+  }, [isTeamMember, runCloseAccount]);
 
   const handleCancelSubscription = () => {
     Alert.alert(
@@ -182,31 +203,30 @@ export default function SettingsScreen() {
 
   const accountTypeLabel =
     rawKind === 'practice'
-      ? 'Practice plan'
+      ? 'Practice'
       : rawKind === 'business'
-        ? 'Business plan'
+        ? 'Business'
         : rawKind === 'individual'
-          ? 'Individual plan'
-          : 'Business plan';
+          ? 'Personal'
+          : 'Business';
 
   const accountTypeDescription =
     rawKind === 'practice'
-      ? 'You manage client businesses under your subscription. Inviting a client business does not add a separate charge—their workspace is included in your practice plan.'
+      ? 'Add client businesses at no extra charge on your practice subscription. Clients sign up with your claim code (no separate Summit payment). Edit names and addresses in Business details or when switching businesses. You cannot claim a client workspace yourself.'
       : rawKind === 'business'
-        ? 'You can invite teammates to access your invoices and sales. Your subscription covers your workspace.'
+        ? 'Your own business workspace. Subscribe to use Summit. You cannot invite others or join another account—except claiming a workspace your accountant created for you below.'
         : rawKind === 'individual'
-          ? 'Personal expense tracking. Switch to a business account anytime at no extra cost to invite collaborators.'
-          : 'Your workspace supports invoices, sales, and inviting teammates. This account predates plan labels in your profile.';
+          ? 'Personal money-in / money-out tracking. Subscribe to use Summit. You cannot invite others or join another account. Switch to a business profile anytime if you need a named business—still solo, no invites.'
+          : 'Your workspace uses the business rules above. Subscribe to use Summit.';
 
   const showBecomeBusiness = !isTeamMember && rawKind === 'individual';
 
-  const showTeamManagement =
-    !isTeamMember &&
-    hasActiveSubscription &&
-    (rawKind === 'business' || rawKind === 'practice' || rawKind === undefined);
-
   const showPracticeClientInvite =
     !isTeamMember && hasActiveSubscription && rawKind === 'practice';
+
+  /** Practice users cannot claim a handoff themselves. */
+  const isPractice = rawKind === 'practice';
+  const showClaimBusinessCard = !isPractice;
 
   const handleBecomeBusiness = async () => {
     const name = currentBusiness ? businessName.trim() : upgradeBizName.trim();
@@ -226,7 +246,7 @@ export default function SettingsScreen() {
       await reloadBusinessData();
       Alert.alert(
         'Business account enabled',
-        'Your subscription and price stay the same. You can invite people under Team & collaborators.'
+        'Your subscription and price stay the same. Business accounts are solo—no team invites.'
       );
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Could not update account.');
@@ -255,10 +275,22 @@ export default function SettingsScreen() {
       setPracticeClientEmail('');
       setPracticeClientAddress('');
       await reloadBusinessData();
-      Alert.alert(
-        'Send claim code to client',
-        `They sign up or sign in with ${em}, then Settings → Claim a business from your accountant. Their workspace is included in your practice subscription—no extra fee.\n\n${invite.token}`
-      );
+      const token = invite.token;
+      const body = `They create an account with ${em} and choose “Invited by accountant” on sign-up (or Settings → Claim a business). No separate Summit payment.\n\n${token}`;
+      Alert.alert('Send claim code to client', body, [
+        {
+          text: 'Copy code',
+          onPress: async () => {
+            try {
+              await Clipboard.setStringAsync(token);
+              Alert.alert('Copied', 'Claim code copied to clipboard.');
+            } catch {
+              Alert.alert('Copy failed', 'Copy the code from the message above.');
+            }
+          },
+        },
+        { text: 'OK', style: 'cancel' },
+      ]);
     } catch (e) {
       Alert.alert('Error', e instanceof Error ? e.message : 'Could not create invite.');
     } finally {
@@ -266,29 +298,14 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleCreateInvite = async () => {
-    const email = inviteEmail.trim().toLowerCase();
-    if (!email || !user?.id) {
-      Alert.alert('Error', 'Enter the collaborator’s email address.');
+  const handleClaimHandoff = async () => {
+    if (isPractice) {
+      Alert.alert(
+        'Not available',
+        'Practice accounts cannot claim a business. You create client workspaces and send claim codes to your clients instead.'
+      );
       return;
     }
-    setInviteBusy(true);
-    try {
-      const inv = await teamAccess.createInvite(user.id, email);
-      setInviteEmail('');
-      await loadTeam();
-      Alert.alert(
-        'Invite created',
-        `Ask them to sign up or log in with ${email}, open Settings, and paste this invite code under “Join a team”:\n\n${inv.token}`
-      );
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not create invite.');
-    } finally {
-      setInviteBusy(false);
-    }
-  };
-
-  const handleClaimHandoff = async () => {
     const t = claimHandoffToken.trim();
     if (!t) {
       Alert.alert('Error', 'Paste the claim code from your accountant.');
@@ -308,26 +325,6 @@ export default function SettingsScreen() {
       Alert.alert('Error', e instanceof Error ? e.message : 'Could not claim business.');
     } finally {
       setClaimHandoffBusy(false);
-    }
-  };
-
-  const handleAcceptInvite = async () => {
-    const t = acceptToken.trim();
-    if (!t) {
-      Alert.alert('Error', 'Paste the invite code.');
-      return;
-    }
-    setAcceptBusy(true);
-    try {
-      await teamAccess.acceptInviteWithToken(t);
-      setAcceptToken('');
-      await refreshSubscription();
-      await reloadBusinessData();
-      Alert.alert('Welcome', 'You now have access to the shared account.');
-    } catch (e) {
-      Alert.alert('Error', e instanceof Error ? e.message : 'Could not accept invite.');
-    } finally {
-      setAcceptBusy(false);
     }
   };
 
@@ -407,7 +404,8 @@ export default function SettingsScreen() {
             <View style={styles.card}>
               <AppText style={styles.cardTitle}>Become a business account</AppText>
               <AppText style={styles.cardHint}>
-                Use a business profile to invite others to your workspace. Your subscription and price do not change.
+                Use a named business on invoices and reports. Still a solo account—no team invites. Your subscription
+                and price do not change.
               </AppText>
               {currentBusiness ? (
                 <AppText style={styles.cardHintMuted}>
@@ -454,76 +452,6 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
           )}
-
-          {/* Accept team invite (own login) */}
-          <View style={styles.card}>
-            <AppText style={styles.cardTitle}>Join a team</AppText>
-            <AppText style={styles.cardHint}>
-              If the business owner sent you an invite, sign in with the email they used, paste the invite code
-              here, then tap Accept.
-            </AppText>
-            <TextInput
-              style={styles.input}
-              placeholder="Invite code"
-              value={acceptToken}
-              onChangeText={setAcceptToken}
-              placeholderTextColor={TEXT_MUTED}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              activeOpacity={0.92}
-              onPress={() => void handleAcceptInvite()}
-              disabled={acceptBusy}
-              style={styles.gradientBtnTouchable}
-            >
-              <LinearGradient
-                colors={[PURPLE, PURPLE_DEEP]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gradientBtn}
-              >
-                <Ionicons name="enter-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
-                <AppText style={styles.gradientBtnText}>{acceptBusy ? 'Accepting…' : 'Accept invite'}</AppText>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.card}>
-            <AppText style={styles.cardTitle}>Claim a business (from your accountant)</AppText>
-            <AppText style={styles.cardHint}>
-              If your accountant set up your business in Summit, sign in with the email they used for you, paste the
-              claim code they sent, then tap Claim. You’ll own the workspace; they keep access to help with tax and
-              books.
-            </AppText>
-            <TextInput
-              style={styles.input}
-              placeholder="Claim code"
-              value={claimHandoffToken}
-              onChangeText={setClaimHandoffToken}
-              placeholderTextColor={TEXT_MUTED}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <TouchableOpacity
-              activeOpacity={0.92}
-              onPress={() => void handleClaimHandoff()}
-              disabled={claimHandoffBusy}
-              style={styles.gradientBtnTouchable}
-            >
-              <LinearGradient
-                colors={[PURPLE, PURPLE_DEEP]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.gradientBtn}
-              >
-                <Ionicons name="ribbon-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
-                <AppText style={styles.gradientBtnText}>
-                  {claimHandoffBusy ? 'Claiming…' : 'Claim business'}
-                </AppText>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
 
           {/* Business */}
           <View style={styles.card}>
@@ -626,122 +554,6 @@ export default function SettingsScreen() {
             </View>
           )}
 
-          {showTeamManagement && (
-            <View style={styles.card}>
-              <AppText style={styles.cardTitle}>Team & collaborators</AppText>
-              <AppText style={styles.cardHint}>
-                Invite people with their own email and password. They can access your businesses, invoices, and sales
-                (same as you). Useful for staff or an accountant.
-              </AppText>
-              <TextInput
-                style={styles.input}
-                placeholder="Collaborator email"
-                value={inviteEmail}
-                onChangeText={setInviteEmail}
-                placeholderTextColor={TEXT_MUTED}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="email-address"
-              />
-              <TouchableOpacity
-                activeOpacity={0.92}
-                onPress={() => void handleCreateInvite()}
-                disabled={inviteBusy}
-                style={styles.secondaryBtnWrap}
-              >
-                <View style={styles.secondaryBtn}>
-                  <Ionicons name="person-add-outline" size={20} color={PURPLE} style={{ marginRight: 8 }} />
-                  <AppText style={styles.secondaryBtnText}>
-                    {inviteBusy ? 'Creating…' : 'Send invite'}
-                  </AppText>
-                </View>
-              </TouchableOpacity>
-              {teamLoading ? (
-                <ActivityIndicator color={PURPLE} style={styles.loader} />
-              ) : (
-                <>
-                  {invites.length > 0 && (
-                    <>
-                      <AppText style={styles.teamSubheading}>Pending invites</AppText>
-                      {invites.map((inv) => (
-                        <View key={inv.id} style={styles.teamRow}>
-                          <View style={styles.teamRowText}>
-                            <AppText style={styles.teamRowTitle}>{inv.invitedEmail}</AppText>
-                            <AppText style={styles.teamRowMeta}>
-                              Expires {new Date(inv.expiresAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
-                            </AppText>
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => {
-                              Alert.alert('Revoke invite', `Stop inviting ${inv.invitedEmail}?`, [
-                                { text: 'Cancel', style: 'cancel' },
-                                {
-                                  text: 'Revoke',
-                                  style: 'destructive',
-                                  onPress: async () => {
-                                    try {
-                                      await teamAccess.deleteInvite(inv.id);
-                                      await loadTeam();
-                                    } catch (e) {
-                                      Alert.alert('Error', e instanceof Error ? e.message : 'Failed');
-                                    }
-                                  },
-                                },
-                              ]);
-                            }}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <AppText style={styles.teamRowAction}>Revoke</AppText>
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </>
-                  )}
-                  {members.length > 0 && (
-                    <>
-                      <AppText style={styles.teamSubheading}>People with access</AppText>
-                      {members.map((m) => (
-                        <View key={m.memberUserId} style={styles.teamRow}>
-                          <View style={styles.teamRowText}>
-                            <AppText style={styles.teamRowTitle}>{m.memberEmail ?? m.memberUserId}</AppText>
-                            <AppText style={styles.teamRowMeta}>Collaborator</AppText>
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => {
-                              Alert.alert(
-                                'Remove access',
-                                `Remove ${m.memberEmail ?? 'this collaborator'}?`,
-                                [
-                                  { text: 'Cancel', style: 'cancel' },
-                                  {
-                                    text: 'Remove',
-                                    style: 'destructive',
-                                    onPress: async () => {
-                                      if (!user?.id) return;
-                                      try {
-                                        await teamAccess.removeMember(user.id, m.memberUserId);
-                                        await loadTeam();
-                                      } catch (e) {
-                                        Alert.alert('Error', e instanceof Error ? e.message : 'Failed');
-                                      }
-                                    },
-                                  },
-                                ]
-                              );
-                            }}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                          >
-                            <AppText style={styles.teamRowAction}>Remove</AppText>
-                          </TouchableOpacity>
-                        </View>
-                      ))}
-                    </>
-                  )}
-                </>
-              )}
-            </View>
-          )}
-
           {Platform.OS !== 'web' && (
             <View style={styles.card}>
               <AppText style={styles.cardTitle}>Photos</AppText>
@@ -775,12 +587,12 @@ export default function SettingsScreen() {
             <AppText style={styles.cardTitle}>Subscription</AppText>
             <AppText style={styles.cardHint}>
               {isTeamMember
-                ? 'You are using the account owner’s subscription to access this workspace.'
+                ? 'Summit access comes from another account’s active subscription (for example your accountant’s practice plan).'
                 : 'Your monthly plan and billing.'}
             </AppText>
             {isTeamMember && (
               <AppText style={styles.teamMemberNote}>
-                Billing changes must be done by the subscriber. You can still manage invoices and sales.
+                Only the paying subscriber can change billing. You can still run invoices and sales in your workspace.
               </AppText>
             )}
             {subscription ? (
@@ -851,6 +663,25 @@ export default function SettingsScreen() {
             ) : (
               <AppText style={styles.muted}>No subscription found.</AppText>
             )}
+          </View>
+
+          <View style={styles.card}>
+            <AppText style={styles.cardTitle}>Close account</AppText>
+            <AppText style={styles.cardHint}>
+              Permanently delete your Summit account and all app data. If this login pays for Summit, your subscription
+              is cancelled immediately and your payment details are removed from our billing provider. This cannot be
+              undone.
+            </AppText>
+            <TouchableOpacity
+              style={styles.destructiveOutline}
+              onPress={handleCloseAccount}
+              disabled={closeAccountBusy}
+              activeOpacity={0.85}
+            >
+              <AppText style={styles.destructiveOutlineText}>
+                {closeAccountBusy ? 'Closing account…' : 'Close my account'}
+              </AppText>
+            </TouchableOpacity>
           </View>
 
           <TouchableOpacity
@@ -979,7 +810,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     lineHeight: 18,
   },
-  loader: { marginVertical: 16 },
   listRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1055,25 +885,6 @@ const styles = StyleSheet.create({
     marginBottom: 14,
     fontStyle: 'italic',
   },
-  teamSubheading: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: TEXT,
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  teamRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: BORDER,
-  },
-  teamRowText: { flex: 1, paddingRight: 12 },
-  teamRowTitle: { fontSize: 15, fontWeight: '600', color: TEXT },
-  teamRowMeta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
-  teamRowAction: { fontSize: 15, fontWeight: '700', color: RED },
   input: {
     backgroundColor: MUTED_CARD,
     borderRadius: 14,

@@ -364,6 +364,10 @@ CREATE POLICY "Users can read relevant subscriptions"
       SELECT 1 FROM account_access_members m
       WHERE m.owner_user_id = subscriptions.user_id AND m.member_user_id = auth.uid()
     )
+    OR EXISTS (
+      SELECT 1 FROM account_access_members m
+      WHERE m.owner_user_id = auth.uid() AND m.member_user_id = subscriptions.user_id
+    )
   );
 
 CREATE POLICY "Users insert own subscription"
@@ -382,7 +386,9 @@ CREATE POLICY "Users delete own subscription"
 
 ### Practice / accountant: hand off a business to a client
 
-Lets an **accountant (practice)** create a business, then send a **claim code** to the business owner’s email. The owner signs up or signs in with that email, enters the code in Settings, and becomes the business owner; the practice stays linked as a **team member** so they can keep switching between clients for year‑end work.
+Lets an **accountant (practice)** create a business, then send a **claim code** to the business owner’s email. The owner signs up or signs in with that email, enters the code in **Settings → Claim a business**, or chooses **Claim a business (from my accountant)** on **Create account** to sign up and claim in one step. They become the business owner; the practice stays linked as a **collaborator** on their account. The app treats the practice’s active subscription as billing for that owner so the client is not asked to pay separately. Deploy **`get_sponsor_subscription_for_claimed_owner`** (SQL block after `claim_business_handoff` above) so this works reliably even before updating `subscriptions` RLS.
+
+**Subscriptions RLS (optional but nice):** Adding the clause where `m.owner_user_id = auth.uid() AND m.member_user_id = subscriptions.user_id` to **`Users can read relevant subscriptions`** lets the client read the practice row directly and avoids depending only on the RPC.
 
 Run **after** the team-access migration above. If you skipped the team block, run the `prevent_business_user_id_change` function from that section first (with `app.allow_business_owner_transfer`), then run this.
 
@@ -480,6 +486,30 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.claim_business_handoff(text) TO authenticated;
+```
+
+**Sponsored billing after claim (required so clients are not sent to Subscribe):** the app calls this RPC to read a **collaborator’s** (practice’s) subscription row when you are the **account owner** and they appear in `account_access_members`. It uses `SECURITY DEFINER` so it still works if you have not yet added the extra `subscriptions` SELECT clause for sponsors. Run once in **SQL Editor**:
+
+```sql
+CREATE OR REPLACE FUNCTION public.get_sponsor_subscription_for_claimed_owner()
+RETURNS jsonb
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT to_jsonb(s)
+  FROM account_access_members m
+  INNER JOIN subscriptions s ON s.user_id = m.member_user_id
+  WHERE m.owner_user_id = auth.uid()
+    AND s.status IN ('active', 'trialing', 'cancel_at_period_end')
+    AND s.current_period_end > now()
+  ORDER BY s.current_period_end DESC
+  LIMIT 1;
+$$;
+
+REVOKE ALL ON FUNCTION public.get_sponsor_subscription_for_claimed_owner() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.get_sponsor_subscription_for_claimed_owner() TO authenticated;
 ```
 
 **Auth metadata (optional but recommended):** the app stores `account_kind` on sign-up (`individual`, `business`, or `practice`) in the user’s **raw user metadata** via `signUp({ options: { data: { account_kind: '...' } } })`. No extra table is required.

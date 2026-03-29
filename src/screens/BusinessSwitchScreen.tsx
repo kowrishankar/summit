@@ -8,6 +8,7 @@ import {
   Alert,
   SectionList,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppText from '../components/AppText';
 import { useApp } from '../contexts/AppContext';
@@ -113,10 +114,22 @@ export default function BusinessSwitchScreen({
         setModalVisible(false);
         await reloadBusinessData();
         await loadHandoffs();
-        Alert.alert(
-          'Send claim code to client',
-          `Email or message ${em} with this code. They must create an account or sign in with that exact email, then use Settings → Claim a business from your accountant.\n\n${invite.token}`
-        );
+        const token = invite.token;
+        const body = `Email or message ${em} with this code. They sign up with that email and choose “Invited by Practice, or use Settings → Claim a business—no separate Summit payment.\n\n${token}`;
+        Alert.alert('Send claim code to client', body, [
+          {
+            text: 'Copy code',
+            onPress: async () => {
+              try {
+                await Clipboard.setStringAsync(token);
+                Alert.alert('Copied', 'Claim code copied to clipboard.');
+              } catch {
+                Alert.alert('Copy failed', 'Copy the code from the message above.');
+              }
+            },
+          },
+          { text: 'OK', style: 'cancel' },
+        ]);
       } else {
         await addBusiness(newName.trim());
         setNewName('');
@@ -160,8 +173,8 @@ export default function BusinessSwitchScreen({
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
       <AppText style={styles.subtitle}>
         {isPractice
-          ? 'Switch between client workspaces. Workspaces awaiting claim still belong to your login until the owner accepts the code you sent. Client businesses you’ve been invited to appear under Shared with you.'
-          : 'Tap a business to switch workspace. Use the card on Home anytime. “Shared with you” means you were invited—those businesses belong to another login.'}
+          ? 'Switch between client workspaces and edit each one’s details in Settings. Workspaces awaiting claim stay on your login until the client uses your code. After they claim, the business stays in your list with shared access.'
+          : 'Tap a business to switch workspace. Use the card on Home anytime. “Another account” means that workspace is linked from someone else (e.g. your accountant) while you use it.'}
       </AppText>
 
       <SectionList

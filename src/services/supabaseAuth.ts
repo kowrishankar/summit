@@ -52,6 +52,14 @@ export async function getSession(): Promise<{ user: User } | null> {
   return { user: mapAuthUser(session.user) };
 }
 
+/** JWT for server routes that verify the user (e.g. close account). */
+export async function getAccessToken(): Promise<string | null> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  return session?.access_token ?? null;
+}
+
 export function onAuthStateChange(callback: (user: User | null) => void): () => void {
   const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
     callback(session?.user ? mapAuthUser(session.user) : null);

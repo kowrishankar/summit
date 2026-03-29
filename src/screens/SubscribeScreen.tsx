@@ -254,6 +254,20 @@ function SubscribeScreenWithStripe() {
       <AppText style={styles.title}>Subscribe to Summit</AppText>
       <AppText style={styles.tagline}>Less admin. Better control. One place for all your invoices.</AppText>
 
+      <TouchableOpacity
+        onPress={() =>
+          Alert.alert(
+            'Claiming from your accountant?',
+            'If your accountant set up your business and sent you a claim code, sign out, tap Create account, and choose “Claim a business (from my accountant)”. You won’t pay separately — it’s covered by their practice plan.\n\nIf you already have an account, sign in and use Settings → Claim a business.',
+            [{ text: 'OK' }]
+          )
+        }
+        style={styles.accountantHintWrap}
+        hitSlop={{ top: 8, bottom: 8 }}
+      >
+        <AppText style={styles.accountantHintText}>Were you invited by your accountant?</AppText>
+      </TouchableOpacity>
+
       <View style={styles.benefitsCard}>
         <AppText style={styles.benefitsTitle}>What you get</AppText>
         {benefits.map((item, index) => (
@@ -344,9 +358,20 @@ const styles = StyleSheet.create({
   tagline: {
     fontSize: 15,
     color: TEXT_SECONDARY,
-    marginBottom: 24,
+    marginBottom: 12,
     textAlign: 'center',
     lineHeight: 22,
+  },
+  accountantHintWrap: {
+    marginBottom: 20,
+    paddingVertical: 4,
+  },
+  accountantHintText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: PRIMARY,
+    textAlign: 'center',
+    textDecorationLine: 'underline',
   },
   benefitsCard: {
     width: '100%',

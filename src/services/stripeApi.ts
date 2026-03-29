@@ -153,3 +153,8 @@ export async function createPortalSession(
 ): Promise<{ url: string }> {
   return postJson('/create-portal-session', { customerId, returnUrl });
 }
+
+/** Server cancels subscription, deletes Stripe customer, then removes Supabase auth user (CASCADE deletes app data). */
+export async function closeUserAccount(accessToken: string): Promise<void> {
+  await postJson<{ ok: boolean }>('/close-account', { accessToken });
+}

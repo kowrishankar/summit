@@ -22,12 +22,14 @@ interface AuthContextValue {
       accountKind?: AccountKind;
       businessName?: string;
       businessAddress?: string;
+      /** After sign-up, claim a business created by an accountant (email must match invite). */
+      claimHandoffToken?: string;
     }
   ) => Promise<{ ok: boolean; error?: string }>;
   logout: () => Promise<void>;
   requestPasswordReset: (email: string) => Promise<{ ok: boolean; token?: string; error?: string }>;
   resetPassword: (token: string, newPassword: string) => Promise<boolean>;
-  /** Individual → business: updates profile and business record. Subscription unchanged. */
+  /** Personal → business: updates profile and business record. Subscription unchanged. */
   upgradeToBusiness: (businessName: string, businessAddress?: string) => Promise<void>;
 }
 
@@ -111,23 +113,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         accountKind?: AccountKind;
         businessName?: string;
         businessAddress?: string;
+        claimHandoffToken?: string;
       }
     ) => {
       try {
-        const kind = options?.accountKind ?? 'individual';
+        const claimTok = options?.claimHandoffToken?.trim();
+        const kind: AccountKind = claimTok ? 'business' : options?.accountKind ?? 'individual';
         const u = await supabaseAuth.signUp(email, password, { accountKind: kind });
         setUser(u);
         if (u?.id) {
-          await loadSubscription(u.id);
-          const biz = options?.businessName?.trim();
-          if (biz && kind !== 'practice') {
-            await addBusiness(u.id, biz, options?.businessAddress?.trim());
-            const businesses = await import('../services/supabaseData').then((m) =>
-              m.getBusinessAccounts(u.id)
-            );
-            const first = businesses[0];
-            if (first) await setCurrentBusinessId(u.id, first.id);
+          if (claimTok) {
+            const { claimBusinessHandoff } = await import('../services/practiceHandoff');
+            try {
+              await claimBusinessHandoff(claimTok);
+              const businesses = await getBusinessAccounts(u.id);
+              const first = businesses[0];
+              if (first) await setCurrentBusinessId(u.id, first.id);
+            } catch (claimErr) {
+              await loadSubscription(u.id);
+              return {
+                ok: false,
+                error:
+                  (claimErr instanceof Error ? claimErr.message : 'Claim failed.') +
+                  ' Your account was created. Sign in and try Settings → Claim a business with the same code, or ask your accountant for a new code.',
+              };
+            }
+          } else {
+            const biz = options?.businessName?.trim();
+            if (biz && kind !== 'practice') {
+              await addBusiness(u.id, biz, options?.businessAddress?.trim());
+              const businesses = await import('../services/supabaseData').then((m) =>
+                m.getBusinessAccounts(u.id)
+              );
+              const first = businesses[0];
+              if (first) await setCurrentBusinessId(u.id, first.id);
+            }
           }
+          await loadSubscription(u.id);
         }
         return { ok: true };
       } catch (e) {
