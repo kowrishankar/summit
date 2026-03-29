@@ -93,6 +93,11 @@ export async function updateBusiness(
   if (error) throw new Error(error.message);
 }
 
+export async function deleteBusiness(id: string): Promise<void> {
+  const { error } = await supabase.from('business_accounts').delete().eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 // ---- Current business preference (stored in DB so it can sync across devices) ----
 export async function getCurrentBusinessId(userId: string): Promise<string | null> {
   const { data } = await supabase
@@ -389,11 +394,14 @@ export async function setSubscriptionCancelAtPeriodEnd(userId: string): Promise<
 
 // ---- Row mappers (snake_case -> camelCase) ----
 function rowToBusiness(r: Record<string, unknown>): BusinessAccount {
+  const invite = r.client_invited_email;
   return {
     id: r.id as string,
     name: r.name as string,
     address: r.address as string | undefined,
     userId: r.user_id as string,
+    clientInviteEmail:
+      typeof invite === 'string' && invite.trim() ? invite.trim() : undefined,
     createdAt: (r.created_at as string).replace('Z', 'Z'),
     updatedAt: (r.updated_at as string).replace('Z', 'Z'),
   };

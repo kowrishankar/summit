@@ -21,6 +21,8 @@ interface AppContextValue {
   switchBusiness: (id: string) => Promise<void>;
   addBusiness: (name: string, address?: string) => Promise<BusinessAccount>;
   updateBusiness: (id: string, patch: { name?: string; address?: string }) => Promise<void>;
+  /** Owner-only: removes business and dependent rows (invoices, sales, pending handoffs). */
+  deleteBusiness: (id: string) => Promise<void>;
   invoices: Invoice[];
   sales: Sale[];
   categories: Category[];
@@ -59,7 +61,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (currentId) {
       const b = all.find((x) => x.id === currentId);
       if (b) setCurrentBusiness(b);
-      else setCurrentBusiness(all[0] ?? null);
+      else {
+        const first = all[0] ?? null;
+        setCurrentBusiness(first);
+        await supabaseData.setCurrentBusinessId(user.id, first?.id ?? null);
+      }
     } else {
       const first = all[0] ?? null;
       setCurrentBusiness(first);
@@ -146,6 +152,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     },
     [businesses, currentBusiness?.id]
+  );
+
+  const deleteBusiness = useCallback(
+    async (id: string) => {
+      if (!user) return;
+      const wasCurrent = currentBusiness?.id === id;
+      await supabaseData.deleteBusiness(id);
+      await loadBusinesses();
+      if (wasCurrent) {
+        const all = await supabaseData.getBusinessAccounts(user.id);
+        const currentId = await supabaseData.getCurrentBusinessId(user.id);
+        const nextBid =
+          (currentId && all.find((x) => x.id === currentId)?.id) ?? all[0]?.id;
+        await loadInvoices(nextBid);
+        await loadSales(nextBid);
+        await loadCategories(nextBid);
+      }
+    },
+    [user, loadBusinesses, currentBusiness?.id, loadInvoices, loadSales, loadCategories]
   );
 
   const addInvoice = useCallback(
@@ -306,6 +331,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     switchBusiness,
     addBusiness,
     updateBusiness,
+    deleteBusiness,
     invoices,
     sales,
     categories,

@@ -408,6 +408,10 @@ BEGIN
 END;
 $$;
 
+-- Stores the client’s sign-up email on the workspace (Settings → Client businesses; survives after claim).
+ALTER TABLE business_accounts
+  ADD COLUMN IF NOT EXISTS client_invited_email TEXT;
+
 CREATE TABLE IF NOT EXISTS business_handoff_invites (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   business_id UUID NOT NULL REFERENCES business_accounts(id) ON DELETE CASCADE,

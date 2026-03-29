@@ -81,6 +81,8 @@ export interface BusinessAccount {
   name: string;
   address?: string;
   userId: string;
+  /** Email the practice used when inviting this client (kept after claim for your records). */
+  clientInviteEmail?: string;
   createdAt: string;
   updatedAt?: string;
 }

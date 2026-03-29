@@ -30,6 +30,27 @@ export async function createClientBusinessWithHandoff(
   const email = ownerEmail.trim().toLowerCase();
   if (!email) throw new Error('Client email is required');
   const business = await supabaseData.addBusiness(practiceUserId, businessName.trim(), businessAddress?.trim());
+  const { error: emailColError } = await supabase
+    .from('business_accounts')
+    .update({
+      client_invited_email: email,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', business.id);
+  if (emailColError) {
+    if (__DEV__) {
+      console.warn(
+        '[practiceHandoff] Could not set client_invited_email. Run in Supabase SQL:',
+        'ALTER TABLE business_accounts ADD COLUMN IF NOT EXISTS client_invited_email TEXT;',
+        emailColError.message
+      );
+    }
+    throw new Error(
+      emailColError.message.includes('client_invited_email')
+        ? 'Database needs column client_invited_email on business_accounts. See docs/SUPABASE-SETUP.md.'
+        : emailColError.message
+    );
+  }
   const token = uuidv4();
   const expiresAt = new Date(Date.now() + HANDOFF_VALID_DAYS * 86400000).toISOString();
   const now = new Date().toISOString();
@@ -50,7 +71,10 @@ export async function createClientBusinessWithHandoff(
   if (error) {
     throw new Error(error.message);
   }
-  return { business, invite: rowToHandoff(data as Record<string, unknown>) };
+  return {
+    business: { ...business, clientInviteEmail: email },
+    invite: rowToHandoff(data as Record<string, unknown>),
+  };
 }
 
 export async function listHandoffsForPractice(practiceUserId: string): Promise<BusinessHandoffInvite[]> {

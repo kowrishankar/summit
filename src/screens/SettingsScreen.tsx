@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -11,6 +11,9 @@ import {
   ActivityIndicator,
   Linking,
   Switch,
+  Modal,
+  Pressable,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
@@ -46,6 +49,7 @@ import {
   shadowCard,
   shadowCardLight,
 } from '../theme/design';
+import type { BusinessAccount } from '../types';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -58,7 +62,14 @@ export default function SettingsScreen() {
     hasActiveSubscription,
     upgradeToBusiness,
   } = useAuth();
-  const { currentBusiness, updateBusiness, reloadBusinessData } = useApp();
+  const {
+    businesses,
+    currentBusiness,
+    addBusiness,
+    updateBusiness,
+    deleteBusiness,
+    reloadBusinessData,
+  } = useApp();
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [saving, setSaving] = useState(false);
@@ -75,6 +86,21 @@ export default function SettingsScreen() {
   const [practiceClientAddress, setPracticeClientAddress] = useState('');
   const [practiceInviteBusy, setPracticeInviteBusy] = useState(false);
   const [closeAccountBusy, setCloseAccountBusy] = useState(false);
+  const [practiceHandoffs, setPracticeHandoffs] = useState<
+    Awaited<ReturnType<typeof practiceHandoff.listHandoffsForPractice>>
+  >([]);
+  const [practiceHqName, setPracticeHqName] = useState('');
+  const [practiceHqAddress, setPracticeHqAddress] = useState('');
+  const [createPracticeBusy, setCreatePracticeBusy] = useState(false);
+  const [practiceBusinessEdit, setPracticeBusinessEdit] = useState<{
+    businessId: string;
+    name: string;
+    address: string;
+    subtitle: string;
+    canDelete: boolean;
+    invitedEmail?: string;
+  } | null>(null);
+  const [practiceBusinessEditSaving, setPracticeBusinessEditSaving] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -82,11 +108,12 @@ export default function SettingsScreen() {
   }, []);
 
   useEffect(() => {
+    if (user?.accountKind === 'practice') return;
     if (currentBusiness) {
       setBusinessName(currentBusiness.name);
       setBusinessAddress(currentBusiness.address ?? '');
     }
-  }, [currentBusiness?.id, currentBusiness?.name, currentBusiness?.address]);
+  }, [user?.accountKind, currentBusiness?.id, currentBusiness?.name, currentBusiness?.address]);
 
   const handleSaveBusiness = async () => {
     if (!currentBusiness) return;
@@ -212,12 +239,12 @@ export default function SettingsScreen() {
 
   const accountTypeDescription =
     rawKind === 'practice'
-      ? 'Add client businesses at no extra charge on your practice subscription. Clients sign up with your claim code (no separate Summit payment). Edit names and addresses in Business details or when switching businesses. You cannot claim a client workspace yourself.'
+      ? 'Create client businesses and manage them under your practice plan.'
       : rawKind === 'business'
-        ? 'Your own business workspace. Subscribe to use Summit. You cannot invite others or join another account—except claiming a workspace your accountant created for you below.'
+        ? 'Your own business workspace.'
         : rawKind === 'individual'
-          ? 'Personal money-in / money-out tracking. Subscribe to use Summit. You cannot invite others or join another account. Switch to a business profile anytime if you need a named business—still solo, no invites.'
-          : 'Your workspace uses the business rules above. Subscribe to use Summit.';
+          ? 'Personal money-in / money-out tracking. Switch to a business profile anytime if you need a named business—still solo, no invites.'
+          : 'Your workspace uses the business rules above.';
 
   const showBecomeBusiness = !isTeamMember && rawKind === 'individual';
 
@@ -227,6 +254,180 @@ export default function SettingsScreen() {
   /** Practice users cannot claim a handoff themselves. */
   const isPractice = rawKind === 'practice';
   const showClaimBusinessCard = !isPractice;
+  const showPracticeWorkspaceSections = isPractice && !isTeamMember;
+
+  const refreshPracticeHandoffs = useCallback(async () => {
+    if (!user?.id || !isPractice) return;
+    const list = await practiceHandoff.listHandoffsForPractice(user.id);
+    setPracticeHandoffs(list);
+  }, [user?.id, isPractice]);
+
+  useEffect(() => {
+    void refreshPracticeHandoffs();
+  }, [refreshPracticeHandoffs]);
+
+  useEffect(() => {
+    if (!isPractice) return;
+    void refreshPracticeHandoffs();
+  }, [businesses.length, isPractice, refreshPracticeHandoffs]);
+
+  const handoffBusinessIds = useMemo(
+    () => new Set(practiceHandoffs.map((h) => h.businessId)),
+    [practiceHandoffs]
+  );
+  const ownedBusinesses = useMemo(
+    () => (user?.id ? businesses.filter((b) => b.userId === user.id) : []),
+    [businesses, user?.id]
+  );
+  /** Owned workspaces that are not pending client invites (your firm’s own). */
+  const practiceHqCandidates = useMemo(() => {
+    const candidates = ownedBusinesses.filter((b) => !handoffBusinessIds.has(b.id));
+    return [...candidates].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }, [ownedBusinesses, handoffBusinessIds]);
+  /** Prefer the workspace you’re viewing if it’s a practice one; otherwise the oldest practice workspace. */
+  const practiceHqBusiness = useMemo(() => {
+    if (practiceHqCandidates.length === 0) return null;
+    const cur = currentBusiness;
+    if (cur && practiceHqCandidates.some((b) => b.id === cur.id)) {
+      return practiceHqCandidates.find((b) => b.id === cur.id) ?? null;
+    }
+    return practiceHqCandidates[0];
+  }, [practiceHqCandidates, currentBusiness?.id]);
+  const pendingClientRows = useMemo(() => {
+    const out: { handoff: (typeof practiceHandoffs)[0]; business: BusinessAccount }[] = [];
+    for (const h of practiceHandoffs) {
+      const business = businesses.find((x) => x.id === h.businessId);
+      if (business) out.push({ handoff: h, business });
+    }
+    return out;
+  }, [practiceHandoffs, businesses]);
+  const claimedClientBusinesses = useMemo(
+    () => (user?.id ? businesses.filter((b) => b.userId !== user.id) : []),
+    [businesses, user?.id]
+  );
+
+  useEffect(() => {
+    if (!showPracticeWorkspaceSections) return;
+    if (practiceHqBusiness) {
+      setPracticeHqName(practiceHqBusiness.name);
+      setPracticeHqAddress(practiceHqBusiness.address ?? '');
+    } else {
+      setPracticeHqName('');
+      setPracticeHqAddress('');
+    }
+  }, [
+    showPracticeWorkspaceSections,
+    practiceHqBusiness?.id,
+    practiceHqBusiness?.name,
+    practiceHqBusiness?.address,
+  ]);
+
+  const openPracticeBusinessEditor = (
+    business: BusinessAccount,
+    opts: { awaitingClaim: boolean; invitedEmail?: string }
+  ) => {
+    setPracticeBusinessEdit({
+      businessId: business.id,
+      name: business.name,
+      address: business.address ?? '',
+      subtitle: opts.awaitingClaim
+        ? `Awaiting client claim • ${opts.invitedEmail ?? '—'}`
+        : 'Client workspace — you can update how it appears for you.',
+      canDelete: opts.awaitingClaim,
+      invitedEmail: opts.invitedEmail,
+    });
+  };
+
+  const handleSavePracticeBusinessEdit = async () => {
+    if (!practiceBusinessEdit) return;
+    const n = practiceBusinessEdit.name.trim();
+    if (!n) {
+      Alert.alert('Name required', 'Enter a business name.');
+      return;
+    }
+    setPracticeBusinessEditSaving(true);
+    try {
+      await updateBusiness(practiceBusinessEdit.businessId, {
+        name: n,
+        address: practiceBusinessEdit.address.trim(),
+      });
+      await reloadBusinessData();
+      await refreshPracticeHandoffs();
+      setPracticeBusinessEdit(null);
+      Alert.alert('Saved', 'Business details updated.');
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not save.');
+    } finally {
+      setPracticeBusinessEditSaving(false);
+    }
+  };
+
+  const handleDeletePracticePendingClient = (business: BusinessAccount, invitedEmail: string) => {
+    Alert.alert(
+      'Delete client workspace?',
+      `Remove "${business.name}" and its claim invite (${invitedEmail}). All invoices and sales in this workspace will be deleted. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteBusiness(business.id);
+                await reloadBusinessData();
+                await refreshPracticeHandoffs();
+                setPracticeBusinessEdit(null);
+              } catch (e) {
+                Alert.alert('Error', e instanceof Error ? e.message : 'Could not delete.');
+              }
+            })();
+          },
+        },
+      ]
+    );
+  };
+
+  const handleSavePracticeHq = async () => {
+    if (!practiceHqBusiness) return;
+    const n = practiceHqName.trim();
+    if (!n) {
+      Alert.alert('Name required', 'Enter your practice name.');
+      return;
+    }
+    setSaving(true);
+    try {
+      await updateBusiness(practiceHqBusiness.id, {
+        name: n,
+        address: practiceHqAddress.trim(),
+      });
+      await reloadBusinessData();
+      Alert.alert('Saved', 'Practice details updated.');
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Failed to save.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCreatePracticeWorkspace = async () => {
+    const n = practiceHqName.trim();
+    if (!n) {
+      Alert.alert('Name required', 'Enter your practice name to create a workspace.');
+      return;
+    }
+    setCreatePracticeBusy(true);
+    try {
+      await addBusiness(n, practiceHqAddress.trim() || undefined);
+      await reloadBusinessData();
+      await refreshPracticeHandoffs();
+      Alert.alert('Created', 'Your practice workspace is ready. You can add client businesses below.');
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not create workspace.');
+    } finally {
+      setCreatePracticeBusy(false);
+    }
+  };
 
   const handleBecomeBusiness = async () => {
     const name = currentBusiness ? businessName.trim() : upgradeBizName.trim();
@@ -275,6 +476,7 @@ export default function SettingsScreen() {
       setPracticeClientEmail('');
       setPracticeClientAddress('');
       await reloadBusinessData();
+      await refreshPracticeHandoffs();
       const token = invite.token;
       const body = `They create an account with ${em} and choose “Invited by accountant” on sign-up (or Settings → Claim a business). No separate Summit payment.\n\n${token}`;
       Alert.alert('Send claim code to client', body, [
@@ -453,59 +655,214 @@ export default function SettingsScreen() {
             </View>
           )}
 
-          {/* Business */}
-          <View style={styles.card}>
-            <AppText style={styles.cardTitle}>Business details</AppText>
-            <AppText style={styles.cardHint}>Edit your current business name and address.</AppText>
-            {currentBusiness ? (
-              <>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Business name"
-                  value={businessName}
-                  onChangeText={setBusinessName}
-                  placeholderTextColor={TEXT_MUTED}
-                />
-                <TextInput
-                  style={[styles.input, styles.inputMultiline]}
-                  placeholder="Business address"
-                  value={businessAddress}
-                  onChangeText={setBusinessAddress}
-                  placeholderTextColor={TEXT_MUTED}
-                  multiline
-                  numberOfLines={2}
-                />
-                <TouchableOpacity
-                  activeOpacity={0.92}
-                  onPress={handleSaveBusiness}
-                  disabled={saving}
-                  style={styles.gradientBtnTouchable}
-                >
-                  <LinearGradient
-                    colors={[PURPLE, PURPLE_DEEP]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.gradientBtn}
+          {/* Practice: firm workspace + client list; others: current business */}
+          {showPracticeWorkspaceSections ? (
+            <>
+              <View style={styles.card}>
+                <AppText style={styles.cardTitle}>Practice details</AppText>
+                <AppText style={styles.cardHint}>
+                  Your accounting practice name and address.
+                </AppText>
+                {practiceHqBusiness ? (
+                  <>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Practice name"
+                      value={practiceHqName}
+                      onChangeText={setPracticeHqName}
+                      placeholderTextColor={TEXT_MUTED}
+                    />
+                    <TextInput
+                      style={[styles.input, styles.inputMultiline]}
+                      placeholder="Practice address"
+                      value={practiceHqAddress}
+                      onChangeText={setPracticeHqAddress}
+                      placeholderTextColor={TEXT_MUTED}
+                      multiline
+                      numberOfLines={2}
+                    />
+                    <TouchableOpacity
+                      activeOpacity={0.92}
+                      onPress={() => void handleSavePracticeHq()}
+                      disabled={saving}
+                      style={styles.gradientBtnTouchable}
+                    >
+                      <LinearGradient
+                        colors={[PURPLE, PURPLE_DEEP]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.gradientBtn}
+                      >
+                        <Ionicons name="business-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                        <AppText style={styles.gradientBtnText}>
+                          {saving ? 'Saving…' : 'Save practice details'}
+                        </AppText>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </>
+                ) : (
+                  <>
+                    <TextInput
+                      style={styles.input}
+                      placeholder="Practice name"
+                      value={practiceHqName}
+                      onChangeText={setPracticeHqName}
+                      placeholderTextColor={TEXT_MUTED}
+                    />
+                    <TextInput
+                      style={[styles.input, styles.inputMultiline]}
+                      placeholder="Practice address (optional)"
+                      value={practiceHqAddress}
+                      onChangeText={setPracticeHqAddress}
+                      placeholderTextColor={TEXT_MUTED}
+                      multiline
+                      numberOfLines={2}
+                    />
+                    <TouchableOpacity
+                      activeOpacity={0.92}
+                      onPress={() => void handleCreatePracticeWorkspace()}
+                      disabled={createPracticeBusy}
+                      style={styles.gradientBtnTouchable}
+                    >
+                      <LinearGradient
+                        colors={[PURPLE, PURPLE_DEEP]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.gradientBtn}
+                      >
+                        <Ionicons name="add-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                        <AppText style={styles.gradientBtnText}>
+                          {createPracticeBusy ? 'Creating…' : 'Create practice workspace'}
+                        </AppText>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  </>
+                )}
+              </View>
+
+              <View style={styles.card}>
+                <AppText style={styles.cardTitle}>Client businesses</AppText>
+                {pendingClientRows.length === 0 && claimedClientBusinesses.length === 0 ? (
+                  <AppText style={styles.muted}>No client businesses yet. Use “Invite a client business” below.</AppText>
+                ) : (
+                  <>
+                    {pendingClientRows.map(({ handoff, business }, idx) => (
+                      <View
+                        key={handoff.id}
+                        style={[styles.practiceClientRow, idx === 0 && styles.practiceClientRowFirst]}
+                      >
+                        <View style={styles.practiceClientRowMain}>
+                          <AppText style={styles.practiceClientName}>{business.name}</AppText>
+                          <AppText style={styles.practiceClientMeta}>
+                            Client email: {handoff.invitedEmail}
+                          </AppText>
+                          <AppText style={styles.practiceClientStatusLine}>Awaiting claim</AppText>
+                        </View>
+                        <View style={styles.practiceClientActions}>
+                          <TouchableOpacity
+                            onPress={() => openPracticeBusinessEditor(business, {
+                              awaitingClaim: true,
+                              invitedEmail: handoff.invitedEmail,
+                            })}
+                            style={styles.practiceClientActionBtn}
+                          >
+                            <AppText style={styles.practiceClientActionText}>Edit</AppText>
+                          </TouchableOpacity>
+                          <TouchableOpacity
+                            onPress={() =>
+                              handleDeletePracticePendingClient(business, handoff.invitedEmail)
+                            }
+                            style={styles.practiceClientActionBtn}
+                          >
+                            <AppText style={styles.practiceClientActionDanger}>Delete</AppText>
+                          </TouchableOpacity>
+                        </View>
+                      </View>
+                    ))}
+                    {claimedClientBusinesses.map((business, idx) => (
+                      <View
+                        key={business.id}
+                        style={[
+                          styles.practiceClientRow,
+                          idx === 0 && pendingClientRows.length === 0 && styles.practiceClientRowFirst,
+                        ]}
+                      >
+                        <View style={styles.practiceClientRowMain}>
+                          <AppText style={styles.practiceClientName}>{business.name}</AppText>
+                          <AppText style={styles.practiceClientMeta}>
+                            Client email: {business.clientInviteEmail ?? '—'}
+                          </AppText>
+                          <AppText style={styles.practiceClientStatusLine}>
+                            Claimed · on client’s account
+                          </AppText>
+                        </View>
+                        <TouchableOpacity
+                          onPress={() =>
+                            openPracticeBusinessEditor(business, { awaitingClaim: false })
+                          }
+                          style={styles.practiceClientActionBtn}
+                        >
+                          <AppText style={styles.practiceClientActionText}>Edit</AppText>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </>
+                )}
+              </View>
+            </>
+          ) : (
+            <View style={styles.card}>
+              <AppText style={styles.cardTitle}>Business details</AppText>
+              <AppText style={styles.cardHint}>Edit your current business name and address.</AppText>
+              {currentBusiness ? (
+                <>
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Business name"
+                    value={businessName}
+                    onChangeText={setBusinessName}
+                    placeholderTextColor={TEXT_MUTED}
+                  />
+                  <TextInput
+                    style={[styles.input, styles.inputMultiline]}
+                    placeholder="Business address"
+                    value={businessAddress}
+                    onChangeText={setBusinessAddress}
+                    placeholderTextColor={TEXT_MUTED}
+                    multiline
+                    numberOfLines={2}
+                  />
+                  <TouchableOpacity
+                    activeOpacity={0.92}
+                    onPress={handleSaveBusiness}
+                    disabled={saving}
+                    style={styles.gradientBtnTouchable}
                   >
-                    <Ionicons name="checkmark-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
-                    <AppText style={styles.gradientBtnText}>
-                      {saving ? 'Saving…' : 'Save business details'}
-                    </AppText>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <AppText style={styles.muted}>Add a business from Home → Switch business.</AppText>
-            )}
-          </View>
+                    <LinearGradient
+                      colors={[PURPLE, PURPLE_DEEP]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={styles.gradientBtn}
+                    >
+                      <Ionicons name="checkmark-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                      <AppText style={styles.gradientBtnText}>
+                        {saving ? 'Saving…' : 'Save business details'}
+                      </AppText>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <AppText style={styles.muted}>Add a business from Home → Switch business.</AppText>
+              )}
+            </View>
+          )}
 
           {showPracticeClientInvite && (
             <View style={styles.card}>
-              <AppText style={styles.cardTitle}>Invite a client business</AppText>
+              <AppText style={styles.cardTitle}>Invite a client</AppText>
               <AppText style={styles.cardHint}>
                 Add a workspace for a client. They sign up with the email you enter and claim it with the code we
-                show. You keep access to their invoices and sales under your practice plan—no extra subscription for
-                them.
+                show.
               </AppText>
               <TextInput
                 style={styles.input}
@@ -694,6 +1051,88 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {practiceBusinessEdit ? (
+        <Modal
+          visible
+          transparent
+          animationType="fade"
+          onRequestClose={() => setPracticeBusinessEdit(null)}
+        >
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => {
+              Keyboard.dismiss();
+              setPracticeBusinessEdit(null);
+            }}
+          >
+            <View style={styles.modalCenter} pointerEvents="box-none">
+              <View style={styles.modalCard} pointerEvents="auto">
+                <AppText style={styles.modalTitle}>Edit business</AppText>
+                <AppText style={styles.modalSubtitle}>{practiceBusinessEdit.subtitle}</AppText>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Business name"
+                  value={practiceBusinessEdit.name}
+                  onChangeText={(t) =>
+                    setPracticeBusinessEdit((prev) => (prev ? { ...prev, name: t } : prev))
+                  }
+                  placeholderTextColor={TEXT_MUTED}
+                />
+                <TextInput
+                  style={[styles.input, styles.inputMultiline]}
+                  placeholder="Business address"
+                  value={practiceBusinessEdit.address}
+                  onChangeText={(t) =>
+                    setPracticeBusinessEdit((prev) => (prev ? { ...prev, address: t } : prev))
+                  }
+                  placeholderTextColor={TEXT_MUTED}
+                  multiline
+                  numberOfLines={2}
+                />
+                <TouchableOpacity
+                  activeOpacity={0.92}
+                  onPress={() => void handleSavePracticeBusinessEdit()}
+                  disabled={practiceBusinessEditSaving}
+                  style={styles.gradientBtnTouchable}
+                >
+                  <LinearGradient
+                    colors={[PURPLE, PURPLE_DEEP]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.gradientBtn}
+                  >
+                    <Ionicons name="checkmark-circle-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                    <AppText style={styles.gradientBtnText}>
+                      {practiceBusinessEditSaving ? 'Saving…' : 'Save changes'}
+                    </AppText>
+                  </LinearGradient>
+                </TouchableOpacity>
+                {practiceBusinessEdit.canDelete && practiceBusinessEdit.invitedEmail ? (
+                  <TouchableOpacity
+                    style={[styles.destructiveOutline, { marginTop: 12 }]}
+                    onPress={() => {
+                      const b = businesses.find((x) => x.id === practiceBusinessEdit.businessId);
+                      if (b)
+                        handleDeletePracticePendingClient(b, practiceBusinessEdit.invitedEmail!);
+                    }}
+                    activeOpacity={0.85}
+                  >
+                    <AppText style={styles.destructiveOutlineText}>Delete workspace</AppText>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  style={styles.modalCancelBtn}
+                  onPress={() => setPracticeBusinessEdit(null)}
+                  activeOpacity={0.85}
+                >
+                  <AppText style={styles.modalCancelText}>Cancel</AppText>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Pressable>
+        </Modal>
+      ) : null}
     </View>
   );
 }
@@ -730,7 +1169,7 @@ const styles = StyleSheet.create({
     ...shadowCard,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '700',
     color: TEXT,
     marginBottom: 6,
@@ -955,5 +1394,98 @@ const styles = StyleSheet.create({
     color: RED,
     fontSize: 16,
     fontWeight: '700',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.52)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  modalCenter: {
+    width: '100%',
+  },
+  modalCard: {
+    backgroundColor: CARD_BG,
+    borderRadius: 20,
+    padding: 20,
+    ...shadowCard,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: TEXT,
+    marginBottom: 6,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  modalCancelBtn: {
+    marginTop: 14,
+    alignItems: 'center',
+    paddingVertical: 10,
+  },
+  modalCancelText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: TEXT_MUTED,
+  },
+  practiceClientRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 12,
+    paddingTop: 14,
+    marginTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: BORDER,
+  },
+  practiceClientRowFirst: {
+    paddingTop: 0,
+    marginTop: 0,
+    borderTopWidth: 0,
+  },
+  practiceClientRowMain: { flex: 1, minWidth: 0 },
+  practiceClientName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: TEXT,
+    marginBottom: 4,
+  },
+  practiceClientMeta: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: TEXT_SECONDARY,
+    lineHeight: 18,
+    marginTop: 4,
+  },
+  practiceClientStatusLine: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    marginTop: 2,
+    lineHeight: 16,
+  },
+  practiceClientActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+  },
+  practiceClientActionBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  practiceClientActionText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: PURPLE,
+  },
+  practiceClientActionDanger: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: RED,
   },
 });

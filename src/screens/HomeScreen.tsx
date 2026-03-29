@@ -329,7 +329,7 @@ export default function HomeScreen({
           <View style={styles.sharedBusinessBannerTextCol}>
             <AppText style={styles.sharedBusinessBannerTitle}>Shared business</AppText>
             <AppText style={styles.sharedBusinessBannerBody}>
-              You’re viewing a business from another account (invited teammate). Invoices and sales here belong to
+              You’re viewing a business from another account. Invoices and sales here belong to
               that workspace.
             </AppText>
           </View>
