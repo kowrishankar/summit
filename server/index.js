@@ -35,7 +35,7 @@ async function findExistingSubscriptionForPrice(customerId) {
 }
 
 if (!STRIPE_PRICE_ID) {
-  console.warn('STRIPE_PRICE_ID not set. Create a Price in Stripe Dashboard for £14.99/month and set it.');
+  console.warn('STRIPE_PRICE_ID not set. Create a Price in Stripe Dashboard for £4.99/month and set it.');
 } else if (STRIPE_PRICE_ID.startsWith('prod_')) {
   console.error('STRIPE_PRICE_ID must be a Price ID (starts with price_), not a Product ID (prod_). In Dashboard → Products → your product → Pricing, copy the Price ID.');
 } else {

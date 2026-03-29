@@ -1,12 +1,16 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import type { User, Subscription } from '../types';
 import * as supabaseAuth from '../services/supabaseAuth';
-import { getSubscription, addBusiness, setCurrentBusinessId } from '../services/supabaseData';
-import { hasActiveAccess } from '../services/subscription';
+import { addBusiness, setCurrentBusinessId } from '../services/supabaseData';
+import { hasActiveAccess, resolveBillingAndSubscription } from '../services/subscription';
 
 interface AuthContextValue {
   user: User | null;
   subscription: Subscription | null;
+  /** User id whose subscription grants app access (same as user when you are the subscriber). */
+  billingUserId: string;
+  /** Signed in as a collaborator using the owner's subscription. */
+  isTeamMember: boolean;
   hasActiveSubscription: boolean;
   loading: boolean;
   refreshSubscription: (userId?: string) => Promise<Subscription | null>;
@@ -27,15 +31,18 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [billingUserId, setBillingUserId] = useState('');
   const [loading, setLoading] = useState(true);
 
   const loadSubscription = useCallback(async (userId: string): Promise<Subscription | null> => {
     try {
-      const sub = await getSubscription(userId);
+      const { subscription: sub, billingUserId: bid } = await resolveBillingAndSubscription(userId);
       setSubscription(sub);
+      setBillingUserId(bid);
       return sub;
     } catch {
       setSubscription(null);
+      setBillingUserId(userId);
       return null;
     }
   }, []);
@@ -62,7 +69,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!cancelled) {
         setUser(u);
         if (u?.id) loadSubscription(u.id);
-        else setSubscription(null);
+        else {
+          setSubscription(null);
+          setBillingUserId('');
+        }
       }
     });
     return () => {
@@ -72,6 +82,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [loadSubscription]);
 
   const hasActiveSubscription = !!subscription && hasActiveAccess(subscription);
+
+  const isTeamMember = useMemo(
+    () => !!user && billingUserId.length > 0 && user.id !== billingUserId,
+    [user, billingUserId]
+  );
 
   const login = useCallback(
     async (email: string, password: string) => {
@@ -116,6 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabaseAuth.signOut();
     setUser(null);
     setSubscription(null);
+    setBillingUserId('');
   }, []);
 
   const requestPasswordReset = useCallback(async (email: string) => {
@@ -133,6 +149,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextValue = {
     user,
     subscription,
+    billingUserId,
+    isTeamMember,
     hasActiveSubscription,
     loading,
     refreshSubscription,

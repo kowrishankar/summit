@@ -134,6 +134,248 @@ CREATE POLICY "Users can manage own preferences"
 -- Storage → New bucket → name: attachments, public or private with RLS
 ```
 
+### Team access (invite collaborators)
+
+Lets the **subscription owner** invite other people (e.g. an accountant) by email. Each person signs in with their **own** Supabase account; invited users see the same businesses, invoices, and sales as the owner. Run this **once** in **SQL Editor** after the main schema (it replaces some RLS policies).
+
+```sql
+-- ---- Tables ----
+CREATE TABLE IF NOT EXISTS account_access_members (
+  owner_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  member_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  member_email TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (owner_user_id, member_user_id)
+);
+
+CREATE TABLE IF NOT EXISTS account_access_invites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  invited_email TEXT NOT NULL,
+  token TEXT NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS account_access_invites_owner ON account_access_invites (owner_user_id);
+CREATE INDEX IF NOT EXISTS account_access_members_member ON account_access_members (member_user_id);
+
+ALTER TABLE account_access_members ENABLE ROW LEVEL SECURITY;
+ALTER TABLE account_access_invites ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Owners and members see membership rows"
+  ON account_access_members FOR SELECT
+  USING (owner_user_id = auth.uid() OR member_user_id = auth.uid());
+
+CREATE POLICY "Owners remove members"
+  ON account_access_members FOR DELETE
+  USING (owner_user_id = auth.uid() OR member_user_id = auth.uid());
+
+CREATE POLICY "Owners manage invites"
+  ON account_access_invites FOR SELECT
+  USING (owner_user_id = auth.uid());
+
+CREATE POLICY "Owners create invites"
+  ON account_access_invites FOR INSERT
+  WITH CHECK (owner_user_id = auth.uid());
+
+CREATE POLICY "Owners delete invites"
+  ON account_access_invites FOR DELETE
+  USING (owner_user_id = auth.uid());
+
+-- Inserts into account_access_members are done by accept_account_invite() below (SECURITY DEFINER).
+
+CREATE OR REPLACE FUNCTION public.accept_account_invite(invite_token TEXT)
+RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  inv account_access_invites%ROWTYPE;
+  em TEXT;
+BEGIN
+  SELECT * INTO inv FROM account_access_invites
+  WHERE token = invite_token AND expires_at > now();
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'invalid_or_expired_invite';
+  END IF;
+
+  SELECT lower(trim(email)) INTO em FROM auth.users WHERE id = auth.uid();
+  IF em IS NULL OR lower(trim(inv.invited_email)) <> em THEN
+    RAISE EXCEPTION 'email_mismatch';
+  END IF;
+
+  IF inv.owner_user_id = auth.uid() THEN
+    RAISE EXCEPTION 'cannot_accept_own_invite';
+  END IF;
+
+  INSERT INTO account_access_members (owner_user_id, member_user_id, member_email)
+  VALUES (inv.owner_user_id, auth.uid(), (SELECT email FROM auth.users WHERE id = auth.uid()))
+  ON CONFLICT (owner_user_id, member_user_id) DO UPDATE
+  SET member_email = EXCLUDED.member_email;
+
+  DELETE FROM account_access_invites WHERE id = inv.id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.accept_account_invite(TEXT) TO authenticated;
+
+-- Prevent changing business owner via API (team members may update name/address)
+CREATE OR REPLACE FUNCTION public.prevent_business_user_id_change()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+AS $$
+BEGIN
+  IF NEW.user_id IS DISTINCT FROM OLD.user_id THEN
+    RAISE EXCEPTION 'Cannot change business owner';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS business_accounts_prevent_owner_change ON business_accounts;
+CREATE TRIGGER business_accounts_prevent_owner_change
+  BEFORE UPDATE ON business_accounts
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.prevent_business_user_id_change();
+
+-- ---- Replace business_accounts policies (team can read/update, only owner inserts/deletes) ----
+DROP POLICY IF EXISTS "Users can manage own businesses" ON business_accounts;
+
+CREATE POLICY "Users can view accessible businesses"
+  ON business_accounts FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM account_access_members m
+      WHERE m.owner_user_id = business_accounts.user_id AND m.member_user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users insert own businesses"
+  ON business_accounts FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Owners update own businesses"
+  ON business_accounts FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Team updates accessible businesses"
+  ON business_accounts FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM account_access_members m
+      WHERE m.owner_user_id = business_accounts.user_id AND m.member_user_id = auth.uid()
+    )
+  )
+  WITH CHECK (true);
+
+CREATE POLICY "Owners delete own businesses"
+  ON business_accounts FOR DELETE
+  USING (user_id = auth.uid());
+
+-- ---- Categories, invoices, sales: include team access ----
+DROP POLICY IF EXISTS "Users can manage categories of their businesses" ON categories;
+CREATE POLICY "Users can manage categories of their businesses"
+  ON categories FOR ALL
+  USING (
+    business_id IN (
+      SELECT ba.id FROM business_accounts ba
+      WHERE ba.user_id = auth.uid()
+         OR EXISTS (
+           SELECT 1 FROM account_access_members m
+           WHERE m.owner_user_id = ba.user_id AND m.member_user_id = auth.uid()
+         )
+    )
+  )
+  WITH CHECK (
+    business_id IN (
+      SELECT ba.id FROM business_accounts ba
+      WHERE ba.user_id = auth.uid()
+         OR EXISTS (
+           SELECT 1 FROM account_access_members m
+           WHERE m.owner_user_id = ba.user_id AND m.member_user_id = auth.uid()
+         )
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can manage invoices of their businesses" ON invoices;
+CREATE POLICY "Users can manage invoices of their businesses"
+  ON invoices FOR ALL
+  USING (
+    business_id IN (
+      SELECT ba.id FROM business_accounts ba
+      WHERE ba.user_id = auth.uid()
+         OR EXISTS (
+           SELECT 1 FROM account_access_members m
+           WHERE m.owner_user_id = ba.user_id AND m.member_user_id = auth.uid()
+         )
+    )
+  )
+  WITH CHECK (
+    business_id IN (
+      SELECT ba.id FROM business_accounts ba
+      WHERE ba.user_id = auth.uid()
+         OR EXISTS (
+           SELECT 1 FROM account_access_members m
+           WHERE m.owner_user_id = ba.user_id AND m.member_user_id = auth.uid()
+         )
+    )
+  );
+
+DROP POLICY IF EXISTS "Users can manage sales of their businesses" ON sales;
+CREATE POLICY "Users can manage sales of their businesses"
+  ON sales FOR ALL
+  USING (
+    business_id IN (
+      SELECT ba.id FROM business_accounts ba
+      WHERE ba.user_id = auth.uid()
+         OR EXISTS (
+           SELECT 1 FROM account_access_members m
+           WHERE m.owner_user_id = ba.user_id AND m.member_user_id = auth.uid()
+         )
+    )
+  )
+  WITH CHECK (
+    business_id IN (
+      SELECT ba.id FROM business_accounts ba
+      WHERE ba.user_id = auth.uid()
+         OR EXISTS (
+           SELECT 1 FROM account_access_members m
+           WHERE m.owner_user_id = ba.user_id AND m.member_user_id = auth.uid()
+         )
+    )
+  );
+
+-- ---- Subscriptions: team can read owner's row (for access); only owner writes ----
+DROP POLICY IF EXISTS "Users can manage own subscription" ON subscriptions;
+
+CREATE POLICY "Users can read relevant subscriptions"
+  ON subscriptions FOR SELECT
+  USING (
+    user_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM account_access_members m
+      WHERE m.owner_user_id = subscriptions.user_id AND m.member_user_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Users insert own subscription"
+  ON subscriptions FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users update own subscription"
+  ON subscriptions FOR UPDATE
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users delete own subscription"
+  ON subscriptions FOR DELETE
+  USING (user_id = auth.uid());
+```
+
 ### Already created `subscriptions` without `trialing`?
 
 If your table was created with an older schema, allow the **free trial** status in Postgres (run once in **SQL Editor**):

@@ -89,7 +89,7 @@ export interface Subscription {
   id: string;
   userId: string;
   status: SubscriptionStatus;
-  /** Price in pence (e.g. 1499 = £14.99) */
+  /** Price in pence (e.g. 499 = £4.99) */
   amountPence: number;
   currency: string;
   interval: 'month';
@@ -121,4 +121,22 @@ export interface SpendSummary {
   taxWeek: number;
   taxMonth: number;
   taxYear: number;
+}
+
+/** Pending invite for another login to access the owner's businesses. */
+export interface AccountAccessInvite {
+  id: string;
+  ownerUserId: string;
+  invitedEmail: string;
+  token: string;
+  expiresAt: string;
+  createdAt: string;
+}
+
+/** Active collaborator on the owner's account. */
+export interface AccountAccessMember {
+  ownerUserId: string;
+  memberUserId: string;
+  memberEmail: string | null;
+  createdAt: string;
 }

@@ -16,6 +16,8 @@ interface SpendSummary {
 interface AppContextValue {
   businesses: BusinessAccount[];
   currentBusiness: BusinessAccount | null;
+  /** Reload businesses from the server (e.g. after accepting a team invite). */
+  reloadBusinessData: () => Promise<void>;
   switchBusiness: (id: string) => Promise<void>;
   addBusiness: (name: string, address?: string) => Promise<BusinessAccount>;
   updateBusiness: (id: string, patch: { name?: string; address?: string }) => Promise<void>;
@@ -42,7 +44,7 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
+  const { user, billingUserId } = useAuth();
   const [businesses, setBusinesses] = useState<BusinessAccount[]>([]);
   const [currentBusiness, setCurrentBusiness] = useState<BusinessAccount | null>(null);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -121,7 +123,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const addBusiness = useCallback(
     async (name: string, address?: string) => {
       if (!user) throw new Error('Not logged in');
-      const newB = await supabaseData.addBusiness(user.id, name, address);
+      const dataOwnerId = billingUserId || user.id;
+      const newB = await supabaseData.addBusiness(dataOwnerId, name, address);
       setBusinesses((prev) => [...prev, newB]);
       if (!currentBusiness) {
         setCurrentBusiness(newB);
@@ -129,7 +132,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
       return newB;
     },
-    [user, currentBusiness]
+    [user, billingUserId, currentBusiness]
   );
 
   const updateBusiness = useCallback(
@@ -298,6 +301,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value: AppContextValue = {
     businesses,
     currentBusiness,
+    reloadBusinessData: loadBusinesses,
     switchBusiness,
     addBusiness,
     updateBusiness,

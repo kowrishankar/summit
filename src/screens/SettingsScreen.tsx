@@ -19,16 +19,16 @@ import AppText from '../components/AppText';
 import { useAuth } from '../contexts/AuthContext';
 import { useApp } from '../contexts/AppContext';
 import {
-  getSubscriptionForUser,
   cancelSubscriptionAtPeriodEnd,
   formatPrice,
 } from '../services/subscription';
+import * as teamAccess from '../services/teamAccess';
+import type { AccountAccessInvite, AccountAccessMember } from '../types';
 import { createPortalSession } from '../services/stripeApi';
 import {
   getSaveCameraPhotosToGallery,
   setSaveCameraPhotosToGallery,
 } from '../services/cameraGalleryPreference';
-import type { Subscription } from '../types';
 import {
   BORDER,
   CARD_BG,
@@ -46,31 +46,47 @@ import {
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
-  const { user, logout } = useAuth();
-  const { currentBusiness, updateBusiness } = useApp();
+  const { user, logout, subscription, refreshSubscription, isTeamMember, hasActiveSubscription } =
+    useAuth();
+  const { currentBusiness, updateBusiness, reloadBusinessData } = useApp();
   const [businessName, setBusinessName] = useState('');
   const [businessAddress, setBusinessAddress] = useState('');
   const [saving, setSaving] = useState(false);
-  const [subscription, setSubscription] = useState<Subscription | null>(null);
-  const [subLoading, setSubLoading] = useState(true);
   const [cancelling, setCancelling] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [saveCameraToGallery, setSaveCameraToGallery] = useState(false);
+  const [invites, setInvites] = useState<AccountAccessInvite[]>([]);
+  const [members, setMembers] = useState<AccountAccessMember[]>([]);
+  const [teamLoading, setTeamLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [acceptToken, setAcceptToken] = useState('');
+  const [acceptBusy, setAcceptBusy] = useState(false);
 
-  const loadSubscription = useCallback(async () => {
-    if (!user?.id) return;
-    setSubLoading(true);
+  const loadTeam = useCallback(async () => {
+    if (!user?.id || isTeamMember) return;
+    setTeamLoading(true);
     try {
-      const sub = await getSubscriptionForUser(user.id);
-      setSubscription(sub);
+      const [inv, mem] = await Promise.all([
+        teamAccess.listInvitesForOwner(user.id),
+        teamAccess.listMembersForOwner(user.id),
+      ]);
+      setInvites(inv);
+      setMembers(mem);
+    } catch (e) {
+      if (__DEV__) {
+        console.warn('[Settings] Team access load failed (run Supabase team migration?)', e);
+      }
+      setInvites([]);
+      setMembers([]);
     } finally {
-      setSubLoading(false);
+      setTeamLoading(false);
     }
-  }, [user?.id]);
+  }, [user?.id, isTeamMember]);
 
   useEffect(() => {
-    loadSubscription();
-  }, [loadSubscription]);
+    void loadTeam();
+  }, [loadTeam]);
 
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -121,7 +137,7 @@ export default function SettingsScreen() {
             setCancelling(true);
             try {
               const updated = await cancelSubscriptionAtPeriodEnd(user.id);
-              setSubscription(updated ?? null);
+              await refreshSubscription(user.id);
               Alert.alert(
                 'Subscription cancelled',
                 `You can continue using the app until ${updated ? new Date(updated.currentPeriodEnd).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'the end of your billing period'}.`
@@ -138,9 +154,54 @@ export default function SettingsScreen() {
   };
 
   const canCancel =
+    !isTeamMember &&
     subscription &&
     (subscription.status === 'active' || subscription.status === 'trialing') &&
     !subscription.cancelAtPeriodEnd;
+
+  const showTeamManagement = !isTeamMember && hasActiveSubscription;
+
+  const handleCreateInvite = async () => {
+    const email = inviteEmail.trim().toLowerCase();
+    if (!email || !user?.id) {
+      Alert.alert('Error', 'Enter the collaborator’s email address.');
+      return;
+    }
+    setInviteBusy(true);
+    try {
+      const inv = await teamAccess.createInvite(user.id, email);
+      setInviteEmail('');
+      await loadTeam();
+      Alert.alert(
+        'Invite created',
+        `Ask them to sign up or log in with ${email}, open Settings, and paste this invite code under “Join a team”:\n\n${inv.token}`
+      );
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not create invite.');
+    } finally {
+      setInviteBusy(false);
+    }
+  };
+
+  const handleAcceptInvite = async () => {
+    const t = acceptToken.trim();
+    if (!t) {
+      Alert.alert('Error', 'Paste the invite code.');
+      return;
+    }
+    setAcceptBusy(true);
+    try {
+      await teamAccess.acceptInviteWithToken(t);
+      setAcceptToken('');
+      await refreshSubscription();
+      await reloadBusinessData();
+      Alert.alert('Welcome', 'You now have access to the shared account.');
+    } catch (e) {
+      Alert.alert('Error', e instanceof Error ? e.message : 'Could not accept invite.');
+    } finally {
+      setAcceptBusy(false);
+    }
+  };
 
   const handleManageBilling = async () => {
     if (!subscription?.stripeCustomerId) return;
@@ -200,6 +261,40 @@ export default function SettingsScreen() {
             </View>
           </View>
 
+          {/* Accept team invite (own login) */}
+          <View style={styles.card}>
+            <AppText style={styles.cardTitle}>Join a team</AppText>
+            <AppText style={styles.cardHint}>
+              If the business owner sent you an invite, sign in with the email they used, paste the invite code
+              here, then tap Accept.
+            </AppText>
+            <TextInput
+              style={styles.input}
+              placeholder="Invite code"
+              value={acceptToken}
+              onChangeText={setAcceptToken}
+              placeholderTextColor={TEXT_MUTED}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <TouchableOpacity
+              activeOpacity={0.92}
+              onPress={() => void handleAcceptInvite()}
+              disabled={acceptBusy}
+              style={styles.gradientBtnTouchable}
+            >
+              <LinearGradient
+                colors={[PURPLE, PURPLE_DEEP]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.gradientBtn}
+              >
+                <Ionicons name="enter-outline" size={22} color="#fff" style={{ marginRight: 8 }} />
+                <AppText style={styles.gradientBtnText}>{acceptBusy ? 'Accepting…' : 'Accept invite'}</AppText>
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
           {/* Business */}
           <View style={styles.card}>
             <AppText style={styles.cardTitle}>Business details</AppText>
@@ -246,6 +341,122 @@ export default function SettingsScreen() {
             )}
           </View>
 
+          {showTeamManagement && (
+            <View style={styles.card}>
+              <AppText style={styles.cardTitle}>Team & collaborators</AppText>
+              <AppText style={styles.cardHint}>
+                Invite an accountant or teammate with their own email and password. They will see the same
+                businesses, invoices, and sales.
+              </AppText>
+              <TextInput
+                style={styles.input}
+                placeholder="Collaborator email"
+                value={inviteEmail}
+                onChangeText={setInviteEmail}
+                placeholderTextColor={TEXT_MUTED}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+              />
+              <TouchableOpacity
+                activeOpacity={0.92}
+                onPress={() => void handleCreateInvite()}
+                disabled={inviteBusy}
+                style={styles.secondaryBtnWrap}
+              >
+                <View style={styles.secondaryBtn}>
+                  <Ionicons name="person-add-outline" size={20} color={PURPLE} style={{ marginRight: 8 }} />
+                  <AppText style={styles.secondaryBtnText}>
+                    {inviteBusy ? 'Creating…' : 'Send invite'}
+                  </AppText>
+                </View>
+              </TouchableOpacity>
+              {teamLoading ? (
+                <ActivityIndicator color={PURPLE} style={styles.loader} />
+              ) : (
+                <>
+                  {invites.length > 0 && (
+                    <>
+                      <AppText style={styles.teamSubheading}>Pending invites</AppText>
+                      {invites.map((inv) => (
+                        <View key={inv.id} style={styles.teamRow}>
+                          <View style={styles.teamRowText}>
+                            <AppText style={styles.teamRowTitle}>{inv.invitedEmail}</AppText>
+                            <AppText style={styles.teamRowMeta}>
+                              Expires {new Date(inv.expiresAt).toLocaleDateString(undefined, { dateStyle: 'medium' })}
+                            </AppText>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              Alert.alert('Revoke invite', `Stop inviting ${inv.invitedEmail}?`, [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Revoke',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    try {
+                                      await teamAccess.deleteInvite(inv.id);
+                                      await loadTeam();
+                                    } catch (e) {
+                                      Alert.alert('Error', e instanceof Error ? e.message : 'Failed');
+                                    }
+                                  },
+                                },
+                              ]);
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <AppText style={styles.teamRowAction}>Revoke</AppText>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                  {members.length > 0 && (
+                    <>
+                      <AppText style={styles.teamSubheading}>People with access</AppText>
+                      {members.map((m) => (
+                        <View key={m.memberUserId} style={styles.teamRow}>
+                          <View style={styles.teamRowText}>
+                            <AppText style={styles.teamRowTitle}>{m.memberEmail ?? m.memberUserId}</AppText>
+                            <AppText style={styles.teamRowMeta}>Collaborator</AppText>
+                          </View>
+                          <TouchableOpacity
+                            onPress={() => {
+                              Alert.alert(
+                                'Remove access',
+                                `Remove ${m.memberEmail ?? 'this collaborator'}?`,
+                                [
+                                  { text: 'Cancel', style: 'cancel' },
+                                  {
+                                    text: 'Remove',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                      if (!user?.id) return;
+                                      try {
+                                        await teamAccess.removeMember(user.id, m.memberUserId);
+                                        await loadTeam();
+                                      } catch (e) {
+                                        Alert.alert('Error', e instanceof Error ? e.message : 'Failed');
+                                      }
+                                    },
+                                  },
+                                ]
+                              );
+                            }}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                          >
+                            <AppText style={styles.teamRowAction}>Remove</AppText>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                </>
+              )}
+            </View>
+          )}
+
           {Platform.OS !== 'web' && (
             <View style={styles.card}>
               <AppText style={styles.cardTitle}>Photos</AppText>
@@ -277,10 +488,17 @@ export default function SettingsScreen() {
           {/* Subscription */}
           <View style={styles.card}>
             <AppText style={styles.cardTitle}>Subscription</AppText>
-            <AppText style={styles.cardHint}>Your monthly plan and billing.</AppText>
-            {subLoading ? (
-              <ActivityIndicator color={PURPLE} style={styles.loader} />
-            ) : subscription ? (
+            <AppText style={styles.cardHint}>
+              {isTeamMember
+                ? 'You are using the account owner’s subscription to access this workspace.'
+                : 'Your monthly plan and billing.'}
+            </AppText>
+            {isTeamMember && (
+              <AppText style={styles.teamMemberNote}>
+                Billing changes must be done by the subscriber. You can still manage invoices and sales.
+              </AppText>
+            )}
+            {subscription ? (
               <>
                 <View style={styles.listRow}>
                   <AppText style={styles.listLabel}>Plan</AppText>
@@ -312,7 +530,7 @@ export default function SettingsScreen() {
                     })}
                   </AppText>
                 </View>
-                {subscription.stripeCustomerId && (
+                {!isTeamMember && subscription.stripeCustomerId && (
                   <TouchableOpacity
                     activeOpacity={0.92}
                     onPress={handleManageBilling}
@@ -511,6 +729,32 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   muted: { fontSize: 14, color: TEXT_MUTED, lineHeight: 20 },
+  teamMemberNote: {
+    fontSize: 14,
+    color: TEXT_MUTED,
+    lineHeight: 20,
+    marginBottom: 14,
+    fontStyle: 'italic',
+  },
+  teamSubheading: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: TEXT,
+    marginTop: 8,
+    marginBottom: 10,
+  },
+  teamRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+  },
+  teamRowText: { flex: 1, paddingRight: 12 },
+  teamRowTitle: { fontSize: 15, fontWeight: '600', color: TEXT },
+  teamRowMeta: { fontSize: 12, color: TEXT_MUTED, marginTop: 2 },
+  teamRowAction: { fontSize: 15, fontWeight: '700', color: RED },
   input: {
     backgroundColor: MUTED_CARD,
     borderRadius: 14,

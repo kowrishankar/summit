@@ -12,12 +12,35 @@ import type {
 const MONTHLY_PRICE_PENCE = 1499;
 const CURRENCY = 'GBP';
 
+/** Owners whose businesses this user may access as a team member. */
+export async function getTeamOwnerIdsForMember(memberUserId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('account_access_members')
+    .select('owner_user_id')
+    .eq('member_user_id', memberUserId)
+    .order('created_at', { ascending: true });
+  if (error) {
+    if (__DEV__) {
+      console.warn(
+        '[getTeamOwnerIdsForMember]',
+        error.message,
+        '(Add team tables: docs/SUPABASE-SETUP.md — Team access.)'
+      );
+    }
+    return [];
+  }
+  const ids = (data ?? []).map((r: { owner_user_id: string }) => r.owner_user_id);
+  return [...new Set(ids)];
+}
+
 // ---- Business accounts ----
 export async function getBusinessAccounts(userId: string): Promise<BusinessAccount[]> {
+  const ownerIds = await getTeamOwnerIdsForMember(userId);
+  const userIds = [...new Set([userId, ...ownerIds])];
   const { data, error } = await supabase
     .from('business_accounts')
     .select('*')
-    .eq('user_id', userId)
+    .in('user_id', userIds)
     .order('created_at', { ascending: true });
   if (error) throw new Error(error.message);
   return (data ?? []).map(rowToBusiness);

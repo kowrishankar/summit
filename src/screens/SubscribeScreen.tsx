@@ -265,7 +265,7 @@ function SubscribeScreenWithStripe() {
       </View>
 
       <View style={styles.priceBlock}>
-        <AppText style={styles.price}>£14.99</AppText>
+        <AppText style={styles.price}>£4.99</AppText>
         <AppText style={styles.pricePeriod}>per month</AppText>
       </View>
       <AppText style={styles.cancelNote}>Cancel anytime in Settings. No long-term commitment.</AppText>
@@ -275,7 +275,7 @@ function SubscribeScreenWithStripe() {
           <View style={styles.trialTextCol}>
             <AppText style={styles.trialTitle}>Start with a free trial</AppText>
             <AppText style={styles.trialHint}>
-              {STRIPE_TRIAL_DAYS} days free, then £14.99/month. Add a card now — you won’t be charged until the trial
+              {STRIPE_TRIAL_DAYS} days free, then £4.99/month. Add a card now — you won’t be charged until the trial
               ends.
             </AppText>
           </View>
