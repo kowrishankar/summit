@@ -134,8 +134,11 @@ export interface SpendSummary {
   month: number;
   year: number;
   taxWeek: number;
+  /** VAT amounts on expense receipts (invoices) in period. */
   taxMonth: number;
   taxYear: number;
+  /** VAT amounts on sales (income) in the current month only. */
+  taxMonthFromSales: number;
 }
 
 /** Pending invite for another login to access the owner's businesses. */

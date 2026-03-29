@@ -105,6 +105,18 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
     return { rows: rows.slice(0, 8), total };
   }, [invoices, monthStartStr, monthEndStr, categories]);
 
+  /** Input VAT on expense receipts in the selected month (where captured). */
+  const expenseVatMonthTotal = useMemo(() => {
+    let sum = 0;
+    invoices.forEach((inv) => {
+      if ((inv.reviewStatus ?? 'complete') !== 'complete') return;
+      const d = inv.extracted.date;
+      if (!d || d < monthStartStr || d > monthEndStr) return;
+      sum += inv.extracted.vatAmount ?? 0;
+    });
+    return sum;
+  }, [invoices, monthStartStr, monthEndStr]);
+
   const incomeTotals = useMemo(() => {
     let salesTotal = 0;
     sales.forEach((s) => {
@@ -238,6 +250,12 @@ export default function DashboardScreen({ navigation }: { navigation: Nav }) {
               </View>
             );
           })
+        )}
+        {expenseCategories.rows.length > 0 && (
+          <View style={styles.expenseVatFooter}>
+            <AppText style={styles.expenseVatLabel}>Total VAT incurred this month</AppText>
+            <AppText style={styles.expenseVatValue}>{formatCurrency(expenseVatMonthTotal)}</AppText>
+          </View>
         )}
 
         <AppText style={[styles.sectionTitle, styles.sectionSpaced]}>Income</AppText>
@@ -469,6 +487,27 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
     backgroundColor: PURPLE,
+  },
+  expenseVatFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#e2e8f0',
+  },
+  expenseVatLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: TEXT_DARK,
+    flex: 1,
+    paddingRight: 12,
+  },
+  expenseVatValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: PURPLE,
   },
   incomeRow: {
     flexDirection: 'row',

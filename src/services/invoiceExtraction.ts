@@ -14,7 +14,7 @@ IMPORTANT - Dates: Invoice dates are in UK format (day first): DD/MM/YYYY or DD-
   "merchantWebsite": string | null,
   "supplierName": string | null (supplier/vendor name if different from merchant),
   "vatAmount": number | null,
-  "category": string | null,
+  "category": string | null (whenever you can infer it from merchant, supplier, or line items: a SHORT bookkeeping label — do not leave null if the type of spend or income is reasonably clear),
   "currency": string | null (ISO 4217 code e.g. USD, EUR, GBP),
   "amount": number,
   "date": string (YYYY-MM-DD; interpret source dates as UK format DD/MM/YYYY),
@@ -32,13 +32,23 @@ IMPORTANT - Dates: Invoice dates are in UK format (day first): DD/MM/YYYY or DD-
   }>
 }`;
 
-function getOpenAIClient(): OpenAI | null {
+export function getOpenAIClient(): OpenAI | null {
   const apiKey = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
   if (!apiKey) return null;
   return new OpenAI({ apiKey });
 }
 
-export async function extractFromText(text: string): Promise<ExtractedInvoiceData> {
+function docKindCategoryHint(docKind: 'invoice' | 'sale'): string {
+  if (docKind === 'sale') {
+    return ' For "category", infer a concise UK-friendly INCOME label when possible (e.g. Services, Product sales, Consulting, Fees, Other income). Prefer a specific label over null.';
+  }
+  return ' For "category", infer a concise UK-friendly EXPENSE label when possible (e.g. Travel, Meals, Software subscriptions, Office supplies, Rent, Utilities, Motor fuel, Groceries, Professional fees, Insurance, Telecommunications). Prefer a specific label over null.';
+}
+
+export async function extractFromText(
+  text: string,
+  docKind: 'invoice' | 'sale' = 'invoice'
+): Promise<ExtractedInvoiceData> {
   const openai = getOpenAIClient();
   if (!openai) {
     return mockExtraction(text);
@@ -48,7 +58,7 @@ export async function extractFromText(text: string): Promise<ExtractedInvoiceDat
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}`,
+        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
       },
       {
         role: 'user',
@@ -67,7 +77,11 @@ export async function extractFromText(text: string): Promise<ExtractedInvoiceDat
   }
 }
 
-export async function extractFromImageBase64(base64Image: string, mimeType: string): Promise<ExtractedInvoiceData> {
+export async function extractFromImageBase64(
+  base64Image: string,
+  mimeType: string,
+  docKind: 'invoice' | 'sale' = 'invoice'
+): Promise<ExtractedInvoiceData> {
   const openai = getOpenAIClient();
   if (!openai) {
     return mockExtraction('Image received (no API key).');
@@ -77,7 +91,7 @@ export async function extractFromImageBase64(base64Image: string, mimeType: stri
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. Analyze the invoice image and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}`,
+        content: `You are an invoice data extractor. Analyze the invoice image and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
       },
       {
         role: 'user',
@@ -105,7 +119,11 @@ export async function extractFromImageBase64(base64Image: string, mimeType: stri
 }
 
 /** Extract invoice data by sending the PDF directly to GPT-4 (vision-capable model with PDF support). */
-export async function extractFromPdfBase64(pdfBase64: string, filename?: string): Promise<ExtractedInvoiceData> {
+export async function extractFromPdfBase64(
+  pdfBase64: string,
+  filename?: string,
+  docKind: 'invoice' | 'sale' = 'invoice'
+): Promise<ExtractedInvoiceData> {
   const openai = getOpenAIClient();
   if (!openai) {
     return mockExtraction('PDF (no API key).');
@@ -115,7 +133,7 @@ export async function extractFromPdfBase64(pdfBase64: string, filename?: string)
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. Analyze the PDF invoice and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}`,
+        content: `You are an invoice data extractor. Analyze the PDF invoice and return a single JSON object (no markdown). ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
       },
       {
         role: 'user',
@@ -149,14 +167,15 @@ export async function extractFromPdfBase64(pdfBase64: string, filename?: string)
 
 /** Extract from multiple images in order (e.g. long receipt split into sections). Sends all images in one request. */
 export async function extractFromMultipleImagesBase64(
-  images: Array<{ base64: string; mimeType: string }>
+  images: Array<{ base64: string; mimeType: string }>,
+  docKind: 'invoice' | 'sale' = 'invoice'
 ): Promise<ExtractedInvoiceData> {
   const openai = getOpenAIClient();
   if (!openai || images.length === 0) {
     return mockExtraction('Images (no API key or empty).');
   }
   if (images.length === 1) {
-    return extractFromImageBase64(images[0].base64, images[0].mimeType);
+    return extractFromImageBase64(images[0].base64, images[0].mimeType, docKind);
   }
   const content: Array<{ type: 'image_url'; image_url: { url: string } } | { type: 'text'; text: string }> = [];
   for (const img of images) {
@@ -174,7 +193,7 @@ export async function extractFromMultipleImagesBase64(
     messages: [
       {
         role: 'system',
-        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}`,
+        content: `You are an invoice data extractor. ${EXTRACTION_SCHEMA}${docKindCategoryHint(docKind)}`,
       },
       { role: 'user', content },
     ],

@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     color: TEXT_MUTED,
     lineHeight: 20,
     paddingHorizontal: 20,
-    marginTop: 4,
+    marginTop: 18,
     marginBottom: 16,
   },
   sectionTitle: {

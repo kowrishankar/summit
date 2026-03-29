@@ -59,14 +59,14 @@ export async function runReceiptExtraction(
         encoding: FileSystem.EncodingType.Base64,
       });
       if (pdfBase64) {
-        return await extractFromPdfBase64(pdfBase64, snapshot.fileName ?? pdfLabel);
+        return await extractFromPdfBase64(pdfBase64, snapshot.fileName ?? pdfLabel, docKind);
       }
     } catch {
       /* fallback */
     }
     const imageResult = await renderPdfFirstPageToImageBase64(uri);
     if (imageResult) {
-      return await extractFromImageBase64(imageResult.base64, imageResult.mimeType);
+      return await extractFromImageBase64(imageResult.base64, imageResult.mimeType, docKind);
     }
     throw new Error('Could not process this PDF. Try taking a photo instead.');
   }
@@ -82,7 +82,7 @@ export async function runReceiptExtraction(
       const payload = await getImageBase64ForApi(a.uri, a.base64, a.mimeType);
       imagePayloads.push(payload);
     }
-    return await extractFromMultipleImagesBase64(imagePayloads);
+    return await extractFromMultipleImagesBase64(imagePayloads, docKind);
   }
 
   if (assets.length === 1) {
@@ -91,8 +91,8 @@ export async function runReceiptExtraction(
       assets[0].base64,
       assets[0].mimeType
     );
-    return await extractFromImageBase64(base64, mimeType);
+    return await extractFromImageBase64(base64, mimeType, docKind);
   }
 
-  return await extractFromText(noImageMsg);
+  return await extractFromText(noImageMsg, docKind);
 }

@@ -156,6 +156,11 @@ export default function HomeScreen({
     [incomeSummary.month, spendSummary.month]
   );
 
+  const vatMonthTotal = useMemo(
+    () => spendSummary.taxMonth + spendSummary.taxMonthFromSales,
+    [spendSummary.taxMonth, spendSummary.taxMonthFromSales]
+  );
+
   /** Expense share of money movement this month (for progress bar). */
   const expenseBarPct = useMemo(() => {
     const spend = spendSummary.month;
@@ -327,10 +332,10 @@ export default function HomeScreen({
         <View style={styles.sharedBusinessBanner}>
           <Ionicons name="people-outline" size={22} color="#C2410C" style={styles.sharedBusinessBannerIcon} />
           <View style={styles.sharedBusinessBannerTextCol}>
-            <AppText style={styles.sharedBusinessBannerTitle}>Shared business</AppText>
+            <AppText style={styles.sharedBusinessBannerTitle}>Client business</AppText>
             <AppText style={styles.sharedBusinessBannerBody}>
-              You’re viewing a business from another account. Invoices and sales here belong to
-              that workspace.
+              You’re viewing a client’s business. Invoices and sales here belong to
+              that client.
             </AppText>
           </View>
         </View>
@@ -374,6 +379,11 @@ export default function HomeScreen({
               {formatCurrency(netMonth)}
             </Text>
             <Text style={styles.balanceHint}>This month · net (income − expenses)</Text>
+            <View style={styles.balanceVatRow}>
+              <Text style={styles.balanceVatLabel}>VAT this month</Text>
+              <Text style={styles.balanceVatAmount}>{formatCurrency(vatMonthTotal)}</Text>
+            </View>
+
             <View style={styles.progressTrack}>
               <LinearGradient
                 colors={['#B8AFFF', PRIMARY]}
@@ -450,9 +460,9 @@ export default function HomeScreen({
                   </View>
                   <AppText style={styles.pendingHint}>
                     {p.status === 'processing' &&
-                      'Still reading your document in the background. Tap ✕ to discard.'}
+                      'Still reading your document in the background'}
                     {p.status === 'pending_review' &&
-                      'Tap the card to confirm or edit, then save. Tap ✕ to discard.'}
+                      'Tap to view and confirm or edit'}
                     {p.status === 'failed' && 'Tap to edit manually and save, or discard this draft.'}
                   </AppText>
                 </View>
@@ -822,7 +832,30 @@ const styles = StyleSheet.create({
   balanceHint: {
     fontSize: 12,
     color: TEXT_SECONDARY,
+    marginBottom: 10,
+  },
+  balanceVatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  balanceVatLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: TEXT,
+  },
+  balanceVatAmount: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: PURPLE_DEEP,
+  },
+  balanceVatSub: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: TEXT_MUTED,
     marginBottom: 12,
+    lineHeight: 15,
   },
   progressTrack: {
     height: 6,

@@ -85,18 +85,38 @@ export default function ReportsScreen() {
     return Array.from({ length: 6 }, (_, i) => monthWindow(i));
   }, []);
 
+  const currentYear = new Date().getFullYear();
+  const yearStartStr = format(startOfYear(new Date()), 'yyyy-MM-dd');
+  const yearEndExclusive = `${currentYear + 1}-01-01`;
+
   const expensesByMonthDesc = useMemo(() => {
     return monthBuckets.map(({ startStr, endExclusive, label }) => {
-      const total = invoices
+      let total = 0;
+      let vatPaid = 0;
+      invoices
         .filter((inv) => (inv.reviewStatus ?? 'complete') === 'complete')
         .filter((inv) => {
           const dateStr = toDateStr(inv.extracted.date);
           return dateStr >= startStr && dateStr < endExclusive;
         })
-        .reduce((s, inv) => s + (inv.extracted.amount ?? 0), 0);
-      return { label, total };
+        .forEach((inv) => {
+          total += inv.extracted.amount ?? 0;
+          vatPaid += inv.extracted.vatAmount ?? 0;
+        });
+      return { label, total, vatPaid };
     });
   }, [invoices, monthBuckets]);
+
+  /** Input VAT on purchases in the current calendar year (same window as spending donut). */
+  const vatPaidYearTotal = useMemo(() => {
+    return invoices
+      .filter((inv) => (inv.reviewStatus ?? 'complete') === 'complete')
+      .filter((inv) => {
+        const dateStr = toDateStr(inv.extracted.date);
+        return dateStr >= yearStartStr && dateStr < yearEndExclusive;
+      })
+      .reduce((s, inv) => s + (inv.extracted.vatAmount ?? 0), 0);
+  }, [invoices, yearStartStr, yearEndExclusive]);
 
   const incomeByMonthDesc = useMemo(() => {
     return monthBuckets.map(({ startStr, endExclusive, label }) => {
@@ -131,10 +151,6 @@ export default function ReportsScreen() {
     });
     return Math.max(1, m);
   }, [monthlyComparisonAsc]);
-
-  const currentYear = new Date().getFullYear();
-  const yearStartStr = format(startOfYear(new Date()), 'yyyy-MM-dd');
-  const yearEndExclusive = `${currentYear + 1}-01-01`;
 
   const spendingByMerchantYear = useMemo(() => {
     const map = new Map<string, number>();
@@ -229,7 +245,15 @@ export default function ReportsScreen() {
         <View style={styles.cardElevated}>
           <AppText style={styles.cardTitle}>{spendingBreakdownDonut.title}</AppText>
           {donutSegments.length === 0 ? (
-            <AppText style={styles.emptyText}>No expense data for {currentYear} yet.</AppText>
+            <>
+              <AppText style={styles.emptyText}>No expense data for {currentYear} yet.</AppText>
+              {vatPaidYearTotal > 0 && (
+                <View style={styles.vatYearRow}>
+                  <AppText style={styles.vatYearLabel}>VAT paid · {currentYear}</AppText>
+                  <AppText style={styles.vatYearValue}>{formatCurrency(vatPaidYearTotal)}</AppText>
+                </View>
+              )}
+            </>
           ) : (
             <>
               <View style={styles.donutWrap}>
@@ -284,6 +308,11 @@ export default function ReportsScreen() {
                   </View>
                 </View>
               ))}
+              <View style={styles.divider} />
+              <View style={styles.vatYearRow}>
+                <AppText style={styles.vatYearLabel}>VAT paid · {currentYear}</AppText>
+                <AppText style={styles.vatYearValue}>{formatCurrency(vatPaidYearTotal)}</AppText>
+              </View>
             </>
           )}
         </View>
@@ -348,10 +377,16 @@ export default function ReportsScreen() {
           {expensesByMonthDesc.map((row, i) => (
             <View
               key={`exp-${row.label}`}
-              style={[styles.listRow, i === expensesByMonthDesc.length - 1 && styles.listRowLast]}
+              style={[styles.expenseMonthBlock, i === expensesByMonthDesc.length - 1 && styles.listRowLast]}
             >
-              <AppText style={styles.listLabel}>{row.label}</AppText>
-              <AppText style={styles.listValue}>{formatCurrency(row.total)}</AppText>
+              <View style={styles.expenseMonthMainRow}>
+                <AppText style={styles.listLabel}>{row.label}</AppText>
+                <AppText style={styles.listValue}>{formatCurrency(row.total)}</AppText>
+              </View>
+              <View style={styles.listRowVat}>
+                <AppText style={styles.listVatLabel}>VAT paid</AppText>
+                <AppText style={styles.listVatValue}>{formatCurrency(row.vatPaid)}</AppText>
+              </View>
             </View>
           ))}
         </View>
@@ -626,8 +661,63 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: BORDER,
   },
+  expenseMonthBlock: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: BORDER,
+    paddingTop: 10,
+    paddingBottom: 12,
+  },
+  expenseMonthMainRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 4,
+  },
+  listRowVat: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: 2,
+  },
+  listVatLabel: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+  },
+  listVatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: PURPLE_DEEP,
+  },
   listRowLast: {
     borderBottomWidth: 0,
+  },
+  vatYearRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    paddingHorizontal: 2,
+  },
+  vatYearLabel: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: TEXT,
+    flex: 1,
+    paddingRight: 12,
+  },
+  vatYearValue: {
+    fontSize: 17,
+    fontWeight: '800',
+    color: PURPLE_DEEP,
+  },
+  vatYearHint: {
+    fontSize: 11,
+    fontWeight: '500',
+    color: TEXT_MUTED,
+    lineHeight: 15,
+    marginTop: -6,
+    marginBottom: 4,
   },
   listLabel: {
     fontSize: 15,

@@ -1,17 +1,15 @@
-import React, { createContext, useContext, useCallback, useEffect, useState } from 'react';
-import type { BusinessAccount, Invoice, Sale, Category, InvoiceFilters } from '../types';
+import React, { createContext, useContext, useCallback, useEffect, useState, useMemo } from 'react';
+import type {
+  BusinessAccount,
+  Invoice,
+  Sale,
+  Category,
+  InvoiceFilters,
+  SpendSummary,
+} from '../types';
 import { useAuth } from './AuthContext';
 import { startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import * as supabaseData from '../services/supabaseData';
-
-interface SpendSummary {
-  week: number;
-  month: number;
-  year: number;
-  taxWeek: number;
-  taxMonth: number;
-  taxYear: number;
-}
 
 interface AppContextValue {
   businesses: BusinessAccount[];
@@ -297,32 +295,51 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     [sales]
   );
 
-  const now = new Date();
-  const weekStart = startOfWeek(now);
-  const monthStart = startOfMonth(now);
-  const yearStart = startOfYear(now);
-  const spendSummary: SpendSummary = invoices.reduce(
-    (acc, inv) => {
-      if ((inv.reviewStatus ?? 'complete') !== 'complete') return acc;
+  const spendSummary = useMemo((): SpendSummary => {
+    const now = new Date();
+    const weekStartStr = startOfWeek(now, { weekStartsOn: 1 }).toISOString().slice(0, 10);
+    const monthStartStr = startOfMonth(now).toISOString().slice(0, 10);
+    const yearStartStr = startOfYear(now).toISOString().slice(0, 10);
+
+    const acc: SpendSummary = {
+      week: 0,
+      month: 0,
+      year: 0,
+      taxWeek: 0,
+      taxMonth: 0,
+      taxYear: 0,
+      taxMonthFromSales: 0,
+    };
+
+    for (const inv of invoices) {
+      if ((inv.reviewStatus ?? 'complete') !== 'complete') continue;
       const d = inv.extracted.date;
       const amt = inv.extracted.amount ?? 0;
       const tax = inv.extracted.vatAmount ?? 0;
-      if (d >= weekStart.toISOString().slice(0, 10)) {
+      if (d >= weekStartStr) {
         acc.week += amt;
         acc.taxWeek += tax;
       }
-      if (d >= monthStart.toISOString().slice(0, 10)) {
+      if (d >= monthStartStr) {
         acc.month += amt;
         acc.taxMonth += tax;
       }
-      if (d >= yearStart.toISOString().slice(0, 10)) {
+      if (d >= yearStartStr) {
         acc.year += amt;
         acc.taxYear += tax;
       }
-      return acc;
-    },
-    { week: 0, month: 0, year: 0, taxWeek: 0, taxMonth: 0, taxYear: 0 }
-  );
+    }
+
+    for (const s of sales) {
+      if ((s.reviewStatus ?? 'complete') !== 'complete') continue;
+      const d = s.extracted.date;
+      if (!d) continue;
+      const tax = s.extracted.vatAmount ?? 0;
+      if (d >= monthStartStr) acc.taxMonthFromSales += tax;
+    }
+
+    return acc;
+  }, [invoices, sales]);
 
   const value: AppContextValue = {
     businesses,

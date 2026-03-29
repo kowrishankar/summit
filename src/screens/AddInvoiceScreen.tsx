@@ -31,6 +31,7 @@ import { maybeSaveCameraImageToGallery } from '../utils/saveCameraImageToGallery
 import { placeholderProcessingExtracted, placeholderFailedExtracted } from '../utils/placeholderReceipt';
 import type { ExtractedInvoiceData } from '../types';
 import { findDuplicateInvoiceForSave } from '../utils/receiptDuplicate';
+import { resolveCategoryIdForSave } from '../services/categoryResolution';
 import { pdfFirstPageAsImageAsset } from '../utils/appendPdfFirstPageAsImageSection';
 import {
   BORDER,
@@ -588,23 +589,13 @@ export default function AddInvoiceScreen({
 
   const executeSave = async (extractedPayload: ExtractedInvoiceData) => {
     setStep('saving');
-    const extractedCategoryName = extractedPayload.category?.trim();
-    let resolvedCategoryId: string | null = categoryId;
-    if (resolvedCategoryId == null && extractedCategoryName) {
-      const matched = categories.find(
-        (c) => c.name.toLowerCase() === extractedCategoryName.toLowerCase()
-      );
-      if (matched) {
-        resolvedCategoryId = matched.id;
-      } else {
-        try {
-          const newCat = await addCategory(extractedCategoryName);
-          resolvedCategoryId = newCat.id;
-        } catch {
-          resolvedCategoryId = null;
-        }
-      }
-    }
+    const resolvedCategoryId = await resolveCategoryIdForSave({
+      userSelectedCategoryId: categoryId,
+      extracted: extractedPayload,
+      categories,
+      docKind: 'invoice',
+      addCategory,
+    });
     try {
       const assetsForSave =
         pendingImageAssetsRef.current.length > 0 ? pendingImageAssetsRef.current : pendingImageAssets;
@@ -1174,7 +1165,6 @@ export default function AddInvoiceScreen({
           <Text style={styles.doneSubtitle}>
             {extracted.merchantName ?? 'Expense'} · {formatAmount(extracted.amount ?? 0, extracted.currency)}
           </Text>
-          <Text style={styles.doneHint}>You can find it anytime in Records → Invoices</Text>
         </View>
         <TouchableOpacity style={styles.gradientBtnWrap} onPress={finishAndLeave} activeOpacity={0.92}>
           <LinearGradient
