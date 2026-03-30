@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from 'react';
+import React, { useMemo, useRef, useState, useCallback } from 'react';
 import { useScrollToTop } from '@react-navigation/native';
 import {
   View,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -80,7 +81,28 @@ export default function HomeScreen({
   };
 }) {
   const insets = useSafeAreaInsets();
-  const { spendSummary, invoices, sales, currentBusiness, categories, deleteInvoice, deleteSale } = useApp();
+  const {
+    spendSummary,
+    invoices,
+    sales,
+    currentBusiness,
+    categories,
+    deleteInvoice,
+    deleteSale,
+    refreshAllRecords,
+  } = useApp();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await refreshAllRecords();
+    } catch (e) {
+      Alert.alert('Could not refresh', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refreshAllRecords]);
   const { user } = useAuth();
 
   const viewingSharedBusiness = Boolean(
@@ -311,6 +333,14 @@ export default function HomeScreen({
         { paddingTop: Math.max(16, insets.top - 28), paddingBottom: 100 },
       ]}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={PRIMARY}
+          colors={[PRIMARY]}
+        />
+      }
     >
       {/* Header */}
       <View style={styles.headerRow}>

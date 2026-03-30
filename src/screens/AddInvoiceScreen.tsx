@@ -415,9 +415,11 @@ export default function AddInvoiceScreen({
     setStep('choose');
     setDocumentUri(null);
     setFileName('');
+    setIsPdf(false);
     setPendingImageAsset(null);
     pendingImageAssetsRef.current = [];
     setPendingImageAssets([]);
+    setPreviewZoomVisible(false);
     setPreviewZoomIndex(0);
   };
 
@@ -472,21 +474,6 @@ export default function AddInvoiceScreen({
       draftInvoiceIdRef.current = recordId;
       pendingSessionIdRef.current = recordId;
 
-      if (urisToUpload.length > 0 && user?.id) {
-        const isPdfUpload = snapshot.fileName.toLowerCase().endsWith('.pdf');
-        const urls = await uploadAttachments(
-          user.id,
-          'invoices',
-          recordId,
-          urisToUpload,
-          isPdfUpload
-        );
-        await updateInvoice(recordId, {
-          fileUri: urls[0],
-          fileUris: urls.length > 1 ? urls : undefined,
-        });
-      }
-
       addPendingExtracting({
         id: recordId,
         kind: 'invoice',
@@ -513,6 +500,23 @@ export default function AddInvoiceScreen({
           updatePending(recordId, { status: 'error', errorMessage: msg });
         });
 
+      if (urisToUpload.length > 0 && user?.id) {
+        const uid = user.id;
+        const isPdfUpload = snapshot.fileName.toLowerCase().endsWith('.pdf');
+        void (async () => {
+          try {
+            const urls = await uploadAttachments(uid, 'invoices', recordId, urisToUpload, isPdfUpload);
+            await updateInvoice(recordId, {
+              fileUri: urls[0],
+              fileUris: urls.length > 1 ? urls : undefined,
+            });
+          } catch (e) {
+            if (__DEV__) console.warn('[AddInvoice] attachment upload failed', e);
+          }
+        })();
+      }
+
+      selectAnother();
       goToDashboardHome();
     } catch (err) {
       Alert.alert(

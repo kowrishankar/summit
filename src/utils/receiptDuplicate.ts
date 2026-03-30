@@ -132,3 +132,9 @@ export function findDuplicateSaleForSave(
   if (byFp) return { kind: 'fingerprint', record: byFp };
   return null;
 }
+
+/** After deleting the “original” record, remove duplicate marking from rows that pointed at it. */
+export function clearDuplicateLinkFromExtracted(extracted: ExtractedInvoiceData): ExtractedInvoiceData {
+  const { duplicateOfRecordId, isDuplicate, ...rest } = extracted;
+  return rest;
+}

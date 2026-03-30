@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useCallback, useEffect, useState, useMemo } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+} from 'react';
 import type {
   BusinessAccount,
   Invoice,
@@ -12,12 +20,16 @@ import { PERSONAL_MAX_INVOICES, PERSONAL_MAX_SALES } from '../config/pricing';
 import { useAuth } from './AuthContext';
 import { startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import * as supabaseData from '../services/supabaseData';
+import { resumeInvoiceProcessing, resumeSaleProcessing } from '../services/processingRecovery';
+import { clearDuplicateLinkFromExtracted } from '../utils/receiptDuplicate';
 
 interface AppContextValue {
   businesses: BusinessAccount[];
   currentBusiness: BusinessAccount | null;
   /** Reload businesses from the server (e.g. after accepting a team invite). */
   reloadBusinessData: () => Promise<void>;
+  /** Reload businesses, then invoices, sales, and categories for the current workspace (e.g. pull-to-refresh on Home). */
+  refreshAllRecords: () => Promise<void>;
   switchBusiness: (id: string) => Promise<void>;
   addBusiness: (name: string, address?: string) => Promise<BusinessAccount>;
   updateBusiness: (id: string, patch: { name?: string; address?: string }) => Promise<void>;
@@ -52,6 +64,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [sales, setSales] = useState<Sale[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+
+  const invoicesRef = useRef(invoices);
+  const salesRef = useRef(sales);
+  invoicesRef.current = invoices;
+  salesRef.current = sales;
+
+  const processingRecoveryIdsRef = useRef<Set<string>>(new Set());
 
   const loadBusinesses = useCallback(async () => {
     if (!user) return;
@@ -125,6 +144,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCategories([]);
     }
   }, [currentBusiness, loadInvoices, loadSales, loadCategories]);
+
+  const refreshAllRecords = useCallback(async () => {
+    if (!user) return;
+    await loadBusinesses();
+    const bid = await supabaseData.getCurrentBusinessId(user.id);
+    if (bid) {
+      await Promise.all([
+        loadInvoices(bid),
+        loadSales(bid),
+        loadCategories(bid),
+      ]);
+    } else {
+      setInvoices([]);
+      setSales([]);
+      setCategories([]);
+    }
+  }, [user, loadBusinesses, loadInvoices, loadSales, loadCategories]);
 
   const addBusiness = useCallback(
     async (name: string, address?: string) => {
@@ -200,10 +236,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const deleteInvoice = useCallback(async (id: string) => {
-    await supabaseData.deleteInvoice(id);
-    setInvoices((prev) => prev.filter((i) => i.id !== id));
-  }, []);
+  const deleteInvoice = useCallback(
+    async (id: string) => {
+      const linked = invoices.filter((i) => i.extracted.duplicateOfRecordId === id);
+      await supabaseData.deleteInvoice(id);
+      setInvoices((prev) => prev.filter((i) => i.id !== id));
+      for (const row of linked) {
+        await updateInvoice(row.id, {
+          extracted: clearDuplicateLinkFromExtracted(row.extracted),
+        });
+      }
+    },
+    [invoices, updateInvoice]
+  );
 
   const addSale = useCallback(
     async (sale: Omit<Sale, 'id' | 'createdAt' | 'updatedAt'>) => {
@@ -232,10 +277,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
-  const deleteSale = useCallback(async (id: string) => {
-    await supabaseData.deleteSale(id);
-    setSales((prev) => prev.filter((s) => s.id !== id));
-  }, []);
+  const deleteSale = useCallback(
+    async (id: string) => {
+      const linked = sales.filter((s) => s.extracted.duplicateOfRecordId === id);
+      await supabaseData.deleteSale(id);
+      setSales((prev) => prev.filter((s) => s.id !== id));
+      for (const row of linked) {
+        await updateSale(row.id, {
+          extracted: clearDuplicateLinkFromExtracted(row.extracted),
+        });
+      }
+    },
+    [sales, updateSale]
+  );
+
+  /** Resume background extraction after app restart (in-memory job was lost). De-duped per record id. */
+  useEffect(() => {
+    if (!user?.id || !currentBusiness?.id) return;
+
+    for (const inv of invoices) {
+      if (inv.reviewStatus !== 'processing') continue;
+      const key = `inv:${inv.id}`;
+      if (processingRecoveryIdsRef.current.has(key)) continue;
+      processingRecoveryIdsRef.current.add(key);
+      void resumeInvoiceProcessing(inv, updateInvoice, () =>
+        invoicesRef.current.find((i) => i.id === inv.id)
+      ).finally(() => {
+        processingRecoveryIdsRef.current.delete(key);
+      });
+    }
+
+    for (const s of sales) {
+      if (s.reviewStatus !== 'processing') continue;
+      const key = `sale:${s.id}`;
+      if (processingRecoveryIdsRef.current.has(key)) continue;
+      processingRecoveryIdsRef.current.add(key);
+      void resumeSaleProcessing(s, updateSale, () => salesRef.current.find((x) => x.id === s.id)).finally(
+        () => {
+          processingRecoveryIdsRef.current.delete(key);
+        }
+      );
+    }
+  }, [user?.id, currentBusiness?.id, invoices, sales, updateInvoice, updateSale]);
 
   const addCategory = useCallback(
     async (name: string, color?: string) => {
@@ -373,6 +456,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     businesses,
     currentBusiness,
     reloadBusinessData: loadBusinesses,
+    refreshAllRecords,
     switchBusiness,
     addBusiness,
     updateBusiness,
